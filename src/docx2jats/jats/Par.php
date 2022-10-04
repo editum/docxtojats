@@ -14,6 +14,17 @@ use docx2jats\objectModel\DataObject;
 use docx2jats\jats\Text as JatsText;
 
 class Par extends Element {
+	const CLS_TYPE_UNKNOWN = 0;
+	const CLS_TYPE_AMA_COMPATIBLE = 1;
+	const CLS_TYPE_APA_COMPATIBLE = 2;
+	const CLS_TYPE_IEEE = 3;
+
+	// AMA, VANCUVER: '4-10,5' '(10,16–18,20)'
+	const CLS_AMA_COMPATIBLE = '/^\(?\d+([-\x{2013}\x{2014}]\d+)?(,\d+([-\x{2013}\x{2014}]\d+)?)*\)?$/u';
+	// APA (name1, 2015; name2, 2020; name3, nd)
+	const CLS_APA_COMPATIBLE = '/^\([^\d\W]+.*(; [^\d\W]+.*)*\)$/u';
+	// IEE: '[4], [7]-[10]'
+	const CLS_IEEE = '/^\[\d+\]([-\x{2013}\x{2014}]\[\d+\])?(, \[\d+\]([-\x{2013}\x{2014}]\[\d+\])?)*$/u';
 
 	public function __construct(DataObject $dataObject) {
 		parent::__construct($dataObject);
@@ -25,17 +36,8 @@ class Par extends Element {
 			if (get_class($content) === 'docx2jats\objectModel\body\Field') {
 				// Write links to references from Zotero and Mendeley plugin for MS Word
 				if ($content->getType() === Field::DOCX_FIELD_CSL) {
-					$lastKey = array_key_last($content->getRefIds());
-					foreach ($content->getRefIds() as $key => $id) {
-						$refEl = $this->ownerDocument->createElement('xref', $id);
-						$refEl->setAttribute('ref-type', 'bibr');
-						$refEl->setAttribute('rid', Reference::JATS_REF_ID_PREFIX . $id);
-						$this->appendChild($refEl);
-						if ($key !== $lastKey) {
-							$refEl = $this->ownerDocument->createTextNode(' ');
-							$this->appendChild($refEl);
-						}
-					}
+					echo __CLASS__."::".__FUNCTION__."::".__LINE__." -> Referencia de Word de Zotero/Mendeley detectada\n";
+					$this->createCLSRef($content->getRefIds(), $content->getPlainCit());
 				}
 				// Write links to table and figures
 				elseif ($content->getType() === Field::DOCX_FIELD_BOOKMARK_REF) {
@@ -57,15 +59,10 @@ class Par extends Element {
 				// Write links to references from Mendeley plugin for LibreOffice Writer
 				/* @var $content \docx2jats\objectModel\body\Text */
 				if ($content->hasCSLRefs) {
+					echo __CLASS__."::".__FUNCTION__."::".__LINE__." -> Referencia de Libreoffice Mendeley detectada\n";
+					$this->createCLSRef($content->refIds, $content->getContent());
+					// TODO todo esto de $prevTextRefs no le veo lógica, tampoco que se inserten de forma distinta a word, residual????
 					$currentRefs = $content->refIds;
-					foreach ($currentRefs as $currentRefId) {
-						if (!in_array($currentRefId, $prevTextRefs)) {
-							$refEl = $this->ownerDocument->createElement('xref', $currentRefId);
-							$this->appendChild($refEl);
-							$refEl->setAttribute('ref-type', 'bibr');
-							$refEl->setAttribute('rid', Reference::JATS_REF_ID_PREFIX . $currentRefId);
-						}
-					}
 					$prevTextRefs = $currentRefs;
 				}
 				// Write other text
@@ -74,6 +71,109 @@ class Par extends Element {
 					$prevTextRefs = []; // restart track of refs from Mendeley LW plugin
 				}
 			}
+		}
+	}
+
+	/**
+	 * @param array $refIds
+	 * @param string $plainCit
+	 * @return void
+	 * Identifies the type of citation used and creates the reference respecting the rules.
+	 * The ranges will be transformed in lists.
+	 * If the type is uknown it will use by default 1 2 3....
+	 */
+	function createCLSRef(array $refIds, string $plainCit) {
+		// Default fot uknown
+		$type = self::CLS_TYPE_UNKNOWN;
+		$separator = ' ';
+		$format = '%d';
+		$openGroup = false;
+		$closeGroup = false;
+		$arrCit = [];
+
+		// APA and equivalents
+		if (preg_match(self::CLS_APA_COMPATIBLE, $plainCit)) {
+			echo "Detected APA: $plainCit\n";
+			$type = self::CLS_TYPE_APA_COMPATIBLE;
+			$separator = '; ';
+			if (count($refIds) > 1) {
+				// There are not parenthesis if the citation is part of the narrative
+				if (strpos($plainCit, '(') === 0) {
+					$openGroup = '(';
+					$closeGroup = ')';
+				}
+				// Get every citation so they can be referenced later
+				$arrCit = explode($separator, trim($plainCit, '()'));
+				var_dump($arrCit);
+			} else {
+				$arrCit = [ $plainCit ];
+			}
+		}
+		// IEEE '[4], [7]-[10]'
+		elseif (preg_match(self::CLS_IEEE, $plainCit)) {
+			echo "Detected IEEE $type: $plainCit\n";
+			$type = self::CLS_TYPE_IEEE;
+			$separator = ', ';
+			$format = '[%d]';
+		}
+		// TODO AMA text is in superindex format
+		// AMA '4-10,5', Vancuver '(10,16–18,20)'
+		elseif (preg_match(self::CLS_AMA_COMPATIBLE, $plainCit)) {
+			echo "Detected AMA/Vancuver: $plainCit\n";
+			$type=self::CLS_TYPE_AMA_COMPATIBLE;
+			$separator = ',';
+			// Special case Vancuver
+			if (strpos($plainCit, '(') === 0) {
+				if (count($refIds) > 1) {
+					$openGroup = '(';
+					$closeGroup = ')';
+					$format = '%d';
+				} else {
+					$format = '(%d)';
+				}
+			// AMA, (or Vancuver when it's part of the narrative?)
+			} else {
+				$format = '%d';
+			}
+		}
+
+		// Format and write the references
+		if ($openGroup) {
+			$this->appendChild($this->ownerDocument->createTextNode($openGroup));
+		}
+
+		$lastKey = array_key_last($refIds);
+		$i = 0;
+		foreach ($refIds as $key => $id) {
+			// Format ref text depending on CSL type
+			switch ($type) {
+				case self::CLS_TYPE_APA_COMPATIBLE:
+					$text = $arrCit[$i++];
+					break;
+				case self::CLS_TYPE_AMA_COMPATIBLE:
+				case self::CLS_TYPE_IEEE:
+				default:
+					$text = sprintf($format, $id);
+					break;
+			}
+
+			echo __CLASS__."::".__FUNCTION__."::".__LINE__." -> Escribiendo referencia ".$text."\n";
+		
+			// BUG: doesn't scape the text -> $refEl = $this->ownerDocument->createElement('xref', $text);
+			$refEl = $this->ownerDocument->createElement('xref');
+			$refEl->appendChild($this->ownerDocument->createTextNode($text));
+			$refEl->setAttribute('ref-type', 'bibr');
+			$refEl->setAttribute('rid', Reference::JATS_REF_ID_PREFIX . $id);
+			$this->appendChild($refEl);
+			// Insert separator between references
+			if ($key !== $lastKey) {
+				echo __CLASS__."::".__FUNCTION__."::".__LINE__." -> Insertando espaciador $separator\n";
+				$this->appendChild($this->ownerDocument->createTextNode($separator));
+			}
+		}
+
+		if ($closeGroup) {
+			$this->appendChild($this->ownerDocument->createTextNode($closeGroup));
 		}
 	}
 }
