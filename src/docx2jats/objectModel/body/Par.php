@@ -289,7 +289,8 @@ class Par extends DataObject {
 			if ($nextNumber < $number) $propArray[self::DOCX_LIST_END] = true;
 			if ($nextNumber > $number) {
 				$propArray[self::DOCX_LIST_HAS_SUBLIST] = true;
-				$this->subNumberingType = $this->extractNumberingType($nextNumberNode[0]);
+				$nextListItem = $this->getXpath()->query('following-sibling::w:p[1]', $this->getDomElement());
+				$this->subNumberingType = $this->extractNumberingType($nextListItem[0]);
 			}
 		} else {
 			$propArray[self::DOCX_LIST_END] = true;
