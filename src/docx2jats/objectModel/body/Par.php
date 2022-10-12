@@ -22,8 +22,13 @@ class Par extends DataObject {
 	const DOCX_LIST_HAS_SUBLIST = 'hasSublist';
 	const DOCX_LIST_ITEM_ID = 'itemId';
 
-	const DOCX_LIST_TYPE_UNORDERED = 1;
-	const DOCX_LIST_TYPE_ORDERED = 2;
+	const DOCX_LIST_TYPE_SIMPLE = 0;		// WORD: none, JATS: simple
+	const DOCX_LIST_TYPE_UNORDERED = 1;		// JATS: bullet
+	const DOCX_LIST_TYPE_ORDERED = 2;		// WORD: decimal, JATS: order
+	const DOCX_LIST_TYPE_ALPHA_LOWER = 3;	// WORD: lowerLetter, JATS: alpha-lower
+	const DOCX_LIST_TYPE_ALPHA_UPPER = 4;	// WORD: upperLetter, JATS: alpha-upper
+	const DOCX_LIST_TYPE_ROMAN_LOWER = 5;	// WORD: lowerRoman, JATS: lower-roman
+	const DOCX_LIST_TYPE_ROMAN_UPPER = 6;	// WORD: upperRoman, JATS: upper-roman
 
 	private $type = array(); // const
 	private $properties = array();
@@ -45,14 +50,6 @@ class Par extends DataObject {
 	/* @var $numberingType int const DOCX_LIST_TYPE_ */
 	private $numberingType;
 	private $subNumberingType;
-
-	/**
-	 * @var $numberingUnorderedMarkers array
-	 * @brief style markers for unordered lists according to OOXML specifications, see: http://officeopenxml.com/WPnumbering-numFmt.php
-	 * Other markers are used for ordered lists
-	 */
-	// TODO should more detailed list styles be implemented?
-	static $numberingUnorderedMarkers = array("bullet", "none", "");
 
 	public $hasBookmarks = false;
 	public $fldCharRefPos = array(); // position of bookmarks in the content
@@ -345,8 +342,35 @@ class Par extends DataObject {
 
 		$type = Document::getNumberingTypeById($id[0]->nodeValue, $lvl[0]->nodeValue);
 
-		if (!in_array($type, self::$numberingUnorderedMarkers)) $numberingType = self::DOCX_LIST_TYPE_ORDERED;
-
+		/* @brief style markers for unordered lists according to OOXML specifications, see: http://officeopenxml.com/WPnumbering-numFmt.php
+		 * Jats equivalents according to: https://jats.nlm.nih.gov/archiving/tag-library/1.1/attribute/list-type.html
+		 */
+		switch ($type) {
+			case '':
+			case 'none':
+				$numberingType = self::DOCX_LIST_TYPE_SIMPLE;
+				break;
+			case 'bullet':
+			case 'chicago':
+				$numberingType = self::DOCX_LIST_TYPE_UNORDERED;
+				break;
+			case 'lowerLetter':
+				$numberingType = self::DOCX_LIST_TYPE_ALPHA_LOWER;
+				break;
+			case 'lowerRoman':
+				$numberingType = self::DOCX_LIST_TYPE_ROMAN_LOWER;
+				break;
+			case 'upperLetter':
+				$numberingType = self::DOCX_LIST_TYPE_ALPHA_UPPER;
+				break;
+			case 'upperRoman':
+				$numberingType = self::DOCX_LIST_TYPE_ROMAN_UPPER;
+				break;
+			// decimal, decimalEnclosedCircle, decimalEnclosedFullstop, decimalZero, cardinalText, ordinalText
+			default:
+				$numberingType = self::DOCX_LIST_TYPE_ORDERED;
+				break;
+		}
 		return $numberingType;
 	}
 
