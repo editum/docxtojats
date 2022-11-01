@@ -19,6 +19,16 @@ use docx2jats\objectModel\DataObject;
 use docx2jats\objectModel\Document as DOCXDocument;
 
 class Document extends \DOMDocument {
+	const JATS_LIST_TYPES = [
+		Par::DOCX_LIST_TYPE_SIMPLE => 'simple',
+		Par::DOCX_LIST_TYPE_UNORDERED => 'bullet',
+		Par::DOCX_LIST_TYPE_ORDERED => 'order',
+		Par::DOCX_LIST_TYPE_ALPHA_LOWER => 'alpha-lower',
+		Par::DOCX_LIST_TYPE_ALPHA_UPPER => 'alpha-upper',
+		Par::DOCX_LIST_TYPE_ROMAN_LOWER => 'lower-roman',
+		Par::DOCX_LIST_TYPE_ROMAN_UPPER => 'upper-roman',
+	];
+
 	/* @var $docxArchive \docx2jats\DOCXArchive */
 	private $docxArchive;
 
@@ -148,11 +158,7 @@ class Document extends \DOMDocument {
 									// TODO find a way to properly deal with numberings with the same id interrupted by simple regular paragraphs
 									if ($listCounter !== $content->getNumberingId()) {
 										$newList = $this->createElement('list');
-										if ($content->getNumberingType() == Par::DOCX_LIST_TYPE_ORDERED) {
-											$newList->setAttribute("list-type", "order");
-										} else {
-											$newList->setAttribute("list-type", "bullet");
-										}
+										$newList->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getNumberingType()]);
 										$this->lists[$content->getNumberingId()] = $newList;
 									}
 
@@ -175,11 +181,7 @@ class Document extends \DOMDocument {
 
 										if ($hasSublist) {
 											$subList[$content->getNumberingLevel()] = $this->createElement('list');
-											if ($content->getSubNumberingType() == Par::DOCX_LIST_TYPE_ORDERED) {
-												$subList[$content->getNumberingLevel()]->setAttribute("list-type", "order");
-											} else {
-												$subList[$content->getNumberingLevel()]->setAttribute("list-type", "bullet");
-											}
+											$subList[$content->getNumberingLevel()]->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getSubNumberingType()]);
 											$listItem->appendChild($subList[$content->getNumberingLevel()]);
 										}
 									}
