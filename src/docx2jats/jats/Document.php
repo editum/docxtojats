@@ -103,7 +103,7 @@ class Document extends \DOMDocument {
 
 			$subList = array(); // temporary container for sublists
 			$listItem = null; // temporary container for previous list item
-			$listCounter = -1; // temporary container for current list ID
+			$lasListId = ''; // temporary container for last list ID
 			foreach ($document->getContent() as $key => $content) {
 				$contentId = 'sec-' . implode('_', $content->getDimensionalSectionId());
 
@@ -150,33 +150,37 @@ class Document extends \DOMDocument {
 									$section->appendChild($jatsPar);
 									$jatsPar->setContent();
 								} elseif (!in_array(Par::DOCX_PAR_HEADING, $content->getType())) {
+									// ListId is compossed by the section and the numberingId to mitigate malformed list with same id between sections
+									$listId =  $contentId.'-list_'.$content->getNumberingId();
 									$itemId = $content->getNumberingItemProp()[Par::DOCX_LIST_ITEM_ID];
 									$hasSublist = $content->getNumberingItemProp()[Par::DOCX_LIST_HAS_SUBLIST];
 
 									// Creating and appending new list
 									// !array_key_exists... is necessary as there can be several lists with the same id, usually it's malformed doc
 									// TODO find a way to properly deal with numberings with the same id interrupted by simple regular paragraphs
-									if ($listCounter !== $content->getNumberingId()) {
+									// Those are split-lists, they can be intentional or unintentional, (malformed), made. They are not supported by jats
+									if ($lasListId !== $listId) {
 										$newList = $this->createElement('list');
+										$newList->setAttribute('id', $listId);
 										$newList->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getNumberingType()]);
-										$this->lists[$content->getNumberingId()] = $newList;
+										$this->lists[$listId] = $newList;
+										$section->appendChild($this->lists[$listId]);
 									}
 
-									$section->appendChild($this->lists[$content->getNumberingId()]);
-
 									// appends nested lists and list items based on their level
+									$list = &$this->lists[$listId];
 									if (count($itemId) === $content->getNumberingLevel()+1) {
 										$listItem = $this->createElement('list-item');
 										$listItem->appendChild($jatsPar);
 										$jatsPar->setContent();
 
 										if ($content->getNumberingLevel() === 0) {
-											$this->lists[$content->getNumberingId()]->appendChild($listItem);
+											$list->appendChild($listItem);
 										} elseif (array_key_exists($content->getNumberingLevel()-1, $subList)) {
 											$subList[$content->getNumberingLevel()-1]->appendChild($listItem);
-											// Append to first list level if user has set unrealistic level for nested items
 										} else {
-											$this->lists[$content->getNumberingId()]->appendChild($listItem);
+											// Append to first list level if user has set unrealistic level for nested items
+											$list->appendChild($listItem);
 										}
 
 										if ($hasSublist) {
@@ -185,9 +189,8 @@ class Document extends \DOMDocument {
 											$listItem->appendChild($subList[$content->getNumberingLevel()]);
 										}
 									}
-
 									// Refreshing list-item ID number
-									$listCounter = $content->getNumberingId();
+									$lasListId = $listId;
 								}
 							}
 						}
