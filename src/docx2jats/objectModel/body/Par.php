@@ -181,15 +181,11 @@ class Par extends DataObject {
 		}
 
 		// Not a heading if empty
-		if (empty($styleString)) return $level;
-
-		preg_match_all('/\d+/', $styleString, $matches);
-
-		// Treat headings without a number as the 1st level headings
-		if (empty($matches[0])) return $level+1;
-
-		$level = intval(implode('', $matches[0]));
-
+		if (! empty($styleString)) {
+			preg_match_all('/\d+/', $styleString, $matches);
+			// Treat headings without a number as the 1st level headings
+			$level = empty($matches[0]) ? $level+1 : intval(implode('', $matches[0]));
+		}
 		return $level;
 	}
 
