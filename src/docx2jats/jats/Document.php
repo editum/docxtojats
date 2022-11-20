@@ -151,7 +151,7 @@ class Document extends \DOMDocument {
 									$jatsPar->setContent();
 								} elseif (!in_array(Par::DOCX_PAR_HEADING, $content->getType())) {
 									// ListId is compossed by the section and the numberingId to mitigate malformed list with same id between sections
-									$listId =  $contentId.'-list_'.$content->getNumberingId();
+									$listId =  $contentId.'_list-'.$content->getNumberingId();
 									$itemId = $content->getNumberingItemProp()[Par::DOCX_LIST_ITEM_ID];
 									$hasSublist = $content->getNumberingItemProp()[Par::DOCX_LIST_HAS_SUBLIST];
 
