@@ -12,6 +12,7 @@
 use docx2jats\DOCXArchive;
 use docx2jats\jats\Par as JatsPar;
 use docx2jats\objectModel\body\Par;
+use docx2jats\jats\JList as JatsList;
 use docx2jats\jats\Table as JatsTable;
 use docx2jats\jats\Figure as JatsFigure;
 use docx2jats\objectModel\body\Table;
@@ -94,6 +95,9 @@ class Document extends \DOMDocument {
 		$this->article->appendChild($this->back);
 	}
 
+	private $listChunks = [];
+	private $listLvlTypes = [];
+
 	private function extractContent() {
 		$document = $this->docxArchive->getDocument();
 		if (!empty($document->getContent())) {
@@ -101,9 +105,9 @@ class Document extends \DOMDocument {
 			$latestSectionId = array();
 			$latestSections = array();
 
-			$subList = array(); // temporary container for sublists
 			$listItem = null; // temporary container for previous list item
-			$lasListId = ''; // temporary container for last list ID
+			$isPrevNodeList = false; // true when in list
+
 			foreach ($document->getContent() as $key => $content) {
 				$contentId = 'sec-' . implode('_', $content->getDimensionalSectionId());
 
@@ -139,7 +143,6 @@ class Document extends \DOMDocument {
 				}
 
 				switch (get_class($content)) {
-
 					case "docx2jats\objectModel\body\Par":
 						/* @var $content Par */
 						$jatsPar = new JatsPar($content);
@@ -149,48 +152,65 @@ class Document extends \DOMDocument {
 								if (!in_array(Par::DOCX_PAR_LIST, $content->getType())) {
 									$section->appendChild($jatsPar);
 									$jatsPar->setContent();
+									$isPrevNodeList = false;
 								} elseif (!in_array(Par::DOCX_PAR_HEADING, $content->getType())) {
-									// ListId is compossed by the section and the numberingId to mitigate malformed list with same id between sections
-									$listId =  $contentId.'_list-'.$content->getNumberingId();
-									$itemId = $content->getNumberingItemProp()[Par::DOCX_LIST_ITEM_ID];
-									$hasSublist = $content->getNumberingItemProp()[Par::DOCX_LIST_HAS_SUBLIST];
+									$nid = $content->getNumberingId();
+									$lvl = $content->getNumberingLevel()+1;
+									$iid = count($content->getNumberingItemProp()[Par::DOCX_LIST_ITEM_ID]);
+									$id = sprintf("%s-lst-%d", $contentId, $nid);
 
-									// Creating and appending new list
-									// !array_key_exists... is necessary as there can be several lists with the same id, usually it's malformed doc
-									// TODO find a way to properly deal with numberings with the same id interrupted by simple regular paragraphs
-									// Those are split-lists, they can be intentional or unintentional, (malformed), made. They are not supported by jats
-									if ($lasListId !== $listId) {
-										$newList = $this->createElement('list');
-										$newList->setAttribute('id', $listId);
-										$newList->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getNumberingType()]);
-										$this->lists[$listId] = $newList;
-										$section->appendChild($this->lists[$listId]);
+									// New list
+									if (! array_key_exists($id, $this->listChunks)) {
+										$this->listChunks[$id] = [];
+										$isPrevNodeList = false;
 									}
+									// New chunk
+									if (! $isPrevNodeList) {
+										$chunk = count($this->listChunks[$id]);
+										$list = $this->createElement('list');
+										$list->setAttribute('id', $id.'_'.$chunk);
+										//$list->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getNumberingType()]);
+										$section->appendChild($list);
+										$this->listChunks[$id][$chunk] = &$list;
+									// Chunk found
+									} else {
+										$chunk = count($this->listChunks[$id]) - 1;
+										$list = &$this->listChunks[$id][$chunk];
+									}
+									// Update latest list types so they are available to other chunks where the first item is in a sublist
+									$type = $this->listLvlTypes[$id][$lvl] = self::JATS_LIST_TYPES[$content->getNumberingType()];
 
-									// appends nested lists and list items based on their level
-									$list = &$this->lists[$listId];
-									if (count($itemId) === $content->getNumberingLevel()+1) {
+									// TODO what is this comparison?
+									if ($iid === $lvl) {
+										// Search/Create sublists
+										for ($i=1; $i < $lvl; $i++) {
+											// Propagate list type useful in chunks when the first item is a subitem
+											if (isset($this->listLvlTypes[$id][$i]))
+												$list->setAttribute('list-type', $this->listLvlTypes[$id][$i]);
+											// Get sublist from last node
+											$k = &$list->lastChild;
+											if ($k == null) {
+												$k = $this->createElement('list-item');
+												$list->appendChild($k);
+											}
+											$l = &$k->lastChild;
+											// Create it otherwhise
+											if ($l == null || $l->nodeName != 'list') {
+												$l = $this->createElement('list');
+												$k->appendChild($l);
+											}
+											$list = &$l;
+										}
+										// Append the new item to the list
 										$listItem = $this->createElement('list-item');
 										$listItem->appendChild($jatsPar);
 										$jatsPar->setContent();
-
-										if ($content->getNumberingLevel() === 0) {
-											$list->appendChild($listItem);
-										} elseif (array_key_exists($content->getNumberingLevel()-1, $subList)) {
-											$subList[$content->getNumberingLevel()-1]->appendChild($listItem);
-										} else {
-											// Append to first list level if user has set unrealistic level for nested items
-											$list->appendChild($listItem);
-										}
-
-										if ($hasSublist) {
-											$subList[$content->getNumberingLevel()] = $this->createElement('list');
-											$subList[$content->getNumberingLevel()]->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getSubNumberingType()]);
-											$listItem->appendChild($subList[$content->getNumberingLevel()]);
-										}
+										$list->appendChild($listItem);
+										// TODO find a way to do this only when needed
+										// Update list type to ensure that it's correct due to chunks
+										$list->setAttribute("list-type", $type);
 									}
-									// Refreshing list-item ID number
-									$lasListId = $listId;
+									$isPrevNodeList = true;
 								}
 							}
 						}
@@ -213,7 +233,9 @@ class Document extends \DOMDocument {
 								$figure->setContent();
 							}
 						}
+						break;
 				}
+				$isPrevNodeList = (in_array(Par::DOCX_PAR_LIST, $content->getType()) && !in_array(Par::DOCX_PAR_HEADING, $content->getType()));
 			}
 		}
 	}
