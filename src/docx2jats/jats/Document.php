@@ -95,7 +95,8 @@ class Document extends \DOMDocument {
 		$this->article->appendChild($this->back);
 	}
 
-	private $chunks = [];
+	private $listChunks = [];
+	private $listLvlTypes = [];
 
 	private function extractContent() {
 		$document = $this->docxArchive->getDocument();
@@ -156,54 +157,58 @@ class Document extends \DOMDocument {
 									$nid = $content->getNumberingId();
 									$lvl = $content->getNumberingLevel()+1;
 									$iid = count($content->getNumberingItemProp()[Par::DOCX_LIST_ITEM_ID]);
-
 									$id = sprintf("%s-lst-%d", $contentId, $nid);
+
 									// New list
-									if (! array_key_exists($id, $this->chunks)) {
-										$this->chunks[$id] = [];
+									if (! array_key_exists($id, $this->listChunks)) {
+										$this->listChunks[$id] = [];
 										$isPrevNodeList = false;
 									}
 									// New chunk
 									if (! $isPrevNodeList) {
-										$chunk = count($this->chunks[$id]);
+										$chunk = count($this->listChunks[$id]);
 										$list = $this->createElement('list');
 										$list->setAttribute('id', $id.'_'.$chunk);
 										//$list->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getNumberingType()]);
-										$this->chunks[$id][$chunk] = &$list;
 										$section->appendChild($list);
-									// The chunk does exist
+										$this->listChunks[$id][$chunk] = &$list;
+									// Chunk found
 									} else {
-										$chunk = count($this->chunks[$id]) - 1;
-										$list = &$this->chunks[$id][$chunk];
+										$chunk = count($this->listChunks[$id]) - 1;
+										$list = &$this->listChunks[$id][$chunk];
 									}
+									// Update latest list types so they are available to other chunks where the first item is in a sublist
+									$type = $this->listLvlTypes[$id][$lvl] = self::JATS_LIST_TYPES[$content->getNumberingType()];
 
-									// TODO qué coño es esto???
+									// TODO what is this comparison?
 									if ($iid === $lvl) {
-										// Search/Create sublists;
-										if ($lvl > 1) {
-											for ($i=1; $i < $lvl; $i++) {
-												// Get sublist from last node
-												$k = &$list->lastChild;
-												if ($k == null) {
-													$k = $this->createElement('list-item');
-													$list->appendChild($k);
-												}
-												$l = &$k->lastChild;
-												// Create it otherwhise
-												if ($l == null || $l->nodeName != 'list') {
-													$l = $this->createElement('list');
-													$k->appendChild($l);
-												}
-												$list = &$l;
+										// Search/Create sublists
+										for ($i=1; $i < $lvl; $i++) {
+											// Propagate list type useful in chunks when the first item is a subitem
+											if (isset($this->listLvlTypes[$id][$i]))
+												$list->setAttribute('list-type', $this->listLvlTypes[$id][$i]);
+											// Get sublist from last node
+											$k = &$list->lastChild;
+											if ($k == null) {
+												$k = $this->createElement('list-item');
+												$list->appendChild($k);
 											}
+											$l = &$k->lastChild;
+											// Create it otherwhise
+											if ($l == null || $l->nodeName != 'list') {
+												$l = $this->createElement('list');
+												$k->appendChild($l);
+											}
+											$list = &$l;
 										}
 										// Append the new item to the list
 										$listItem = $this->createElement('list-item');
 										$listItem->appendChild($jatsPar);
 										$jatsPar->setContent();
 										$list->appendChild($listItem);
-										// TODO Overwrite list type to ensure it's correct, mostly for chunks
-										$list->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getNumberingType()]);
+										// TODO find a way to do this only when needed
+										// Update list type to ensure that it's correct due to chunks
+										$list->setAttribute("list-type", $type);
 									}
 									$isPrevNodeList = true;
 								}
