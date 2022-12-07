@@ -19,8 +19,8 @@ class Cell extends Element {
 
 	public function setContent() {
 		$dataObject = $this->getDataObject();
-
-		$colspan = $dataObject->getColspan();
+		// Get pruned colspan
+		$colspan = $dataObject->getColspan(true);
 		$rowspan = $dataObject->getRowspan();
 		if ($colspan > 1) {
 			$this->setAttribute('colspan', $colspan);
