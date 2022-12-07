@@ -53,6 +53,8 @@ class Document extends \DOMDocument {
 
 	/* @var $lists array of DOMElements; contains all article's lists, key -> unique list ID, corresponds to ID in numbering.xml */
 	var $lists = array();
+	private $listChunks = [];
+	private $listLvlTypes = [];
 
 	public function __construct(DOCXArchive $docxArchive) {
 		parent::__construct('1.0', 'utf-8');
@@ -94,9 +96,6 @@ class Document extends \DOMDocument {
 		$this->back = $this->createElement('back');
 		$this->article->appendChild($this->back);
 	}
-
-	private $listChunks = [];
-	private $listLvlTypes = [];
 
 	private function extractContent() {
 		$document = $this->docxArchive->getDocument();
@@ -172,6 +171,7 @@ class Document extends \DOMDocument {
 										//$list->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getNumberingType()]);
 										$section->appendChild($list);
 										$this->listChunks[$id][$chunk] = &$list;
+										$this->lists[$id.'_'.$chunk] = &$list;
 									// Chunk found
 									} else {
 										$chunk = count($this->listChunks[$id]) - 1;
@@ -235,7 +235,13 @@ class Document extends \DOMDocument {
 						}
 						break;
 				}
-				$isPrevNodeList = (in_array(Par::DOCX_PAR_LIST, $content->getType()) && !in_array(Par::DOCX_PAR_HEADING, $content->getType()));
+				try {
+					$isPrevNodeList = (in_array(Par::DOCX_PAR_LIST, $content->getType()) && !in_array(Par::DOCX_PAR_HEADING, $content->getType()));
+				} catch (\Throwable $th) {
+					// The node has no getType method
+					$isPrevNodeList = false;
+				}
+					
 			}
 		}
 	}
