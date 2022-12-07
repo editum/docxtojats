@@ -44,11 +44,13 @@ class Cell extends DataObject {
 
 		// Prune colspan when there is a dummycell between column start and colspan
 		$this->prunedColspan = $this->colspan;
-		$cellends = $this->cellNumber + $this->colspan - 1;
-		$dummyCells = $this->getParent()->getParent()->getDummyCells();
-		foreach ($dummyCells as $pos) {
-			if ($this->cellNumber <= $pos && $this->cellNumber + $this->colspan - 1 >= $pos) {
-				$this->prunedColspan--;
+		if ($this->colspan > 1) {
+			$cellends = $this->cellNumber + $this->colspan - 1;
+			$dummyCells = $this->getParent()->getParent()->getDummyCells();
+			foreach ($dummyCells as $pos) {
+				if ($this->cellNumber <= $pos && $this->cellNumber + $this->colspan - 1 >= $pos) {
+					$this->prunedColspan--;
+				}
 			}
 		}
 	}
