@@ -46,8 +46,10 @@ class Cell extends DataObject {
 		$this->prunedColspan = $this->colspan;
 		if ($this->colspan > 1) {
 			$dummyCells = $this->getParent()->getParent()->getDummyCells();
+			$starts = $this->cellNumber;
+			$ends = $this->cellNumber + $this->colspan - 1;
 			foreach ($dummyCells as $pos) {
-				if ($this->cellNumber <= $pos && $this->cellNumber + $this->colspan - 1 >= $pos) {
+				if ($starts <= $pos && $pos <= $ends) {
 					$this->prunedColspan--;
 				}
 			}
