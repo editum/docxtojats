@@ -235,7 +235,13 @@ class Document extends \DOMDocument {
 						}
 						break;
 				}
-				$isPrevNodeList = (in_array(Par::DOCX_PAR_LIST, $content->getType()) && !in_array(Par::DOCX_PAR_HEADING, $content->getType()));
+				try {
+					$isPrevNodeList = (in_array(Par::DOCX_PAR_LIST, $content->getType()) && !in_array(Par::DOCX_PAR_HEADING, $content->getType()));
+				} catch (\Throwable $th) {
+					// The node has no getType method
+					$isPrevNodeList = false;
+				}
+					
 			}
 		}
 	}
