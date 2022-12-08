@@ -10,16 +10,19 @@
  */
 
 use docx2jats\objectModel\DataObject;
-use docx2jats\jats\Par as JatsPar;
+use docx2jats\jats\traits\Container;
+use docx2jats\objectModel\body\Cell as BodyCell;
 
 class Cell extends Element {
+	use Container;
+
 	public function __construct(DataObject $dataObject) {
 		parent::__construct($dataObject);
 	}
 
 	public function setContent() {
+		/** @var BodyCell $dataObject */
 		$dataObject = $this->getDataObject();
-		// Get pruned colspan
 		$colspan = $dataObject->getColspan(true);
 		$rowspan = $dataObject->getRowspan();
 		if ($colspan > 1) {
@@ -30,10 +33,9 @@ class Cell extends Element {
 			$this->setAttribute('rowspan', $rowspan);
 		}
 
+		@$tid = $this->parentNode->parentNode->parentNode->getAttribute('id');
 		foreach ($dataObject->getContent() as $content) {
-			$par = new Par($content);
-			$this->appendChild($par);
-			$par->setContent();
+			$this->appendContent($content, $this, $tid);
 		}
 	}
 }

@@ -15,11 +15,15 @@ use docx2jats\objectModel\body\Par;
 use docx2jats\jats\JList as JatsList;
 use docx2jats\jats\Table as JatsTable;
 use docx2jats\jats\Figure as JatsFigure;
+use docx2jats\jats\traits\Container;
 use docx2jats\objectModel\body\Table;
 use docx2jats\objectModel\DataObject;
 use docx2jats\objectModel\Document as DOCXDocument;
+use DOMDocument;
 
 class Document extends \DOMDocument {
+	use Container;
+
 	const JATS_LIST_TYPES = [
 		Par::DOCX_LIST_TYPE_SIMPLE => 'simple',
 		Par::DOCX_LIST_TYPE_UNORDERED => 'bullet',
@@ -50,11 +54,6 @@ class Document extends \DOMDocument {
 
 	/* @var $references array of DOMElements */
 	var $references = array();
-
-	/* @var $lists array of DOMElements; contains all article's lists, key -> unique list ID, corresponds to ID in numbering.xml */
-	var $lists = array();
-	private $listChunks = [];
-	private $listLvlTypes = [];
 
 	public function __construct(DOCXArchive $docxArchive) {
 		parent::__construct('1.0', 'utf-8');
@@ -141,107 +140,12 @@ class Document extends \DOMDocument {
 					$sectionsOrBody = $this->sections;
 				}
 
-				switch (get_class($content)) {
-					case "docx2jats\objectModel\body\Par":
-						/* @var $content Par */
-						$jatsPar = new JatsPar($content);
-
-						foreach ($sectionsOrBody as $section) {
-							if ($contentId === $section->getAttribute('id') || $section->nodeName === "body") {
-								if (!in_array(Par::DOCX_PAR_LIST, $content->getType())) {
-									$section->appendChild($jatsPar);
-									$jatsPar->setContent();
-									$isPrevNodeList = false;
-								} elseif (!in_array(Par::DOCX_PAR_HEADING, $content->getType())) {
-									$nid = $content->getNumberingId();
-									$lvl = $content->getNumberingLevel()+1;
-									$iid = count($content->getNumberingItemProp()[Par::DOCX_LIST_ITEM_ID]);
-									$id = sprintf("%s-lst-%d", $contentId, $nid);
-
-									// New list
-									if (! array_key_exists($id, $this->listChunks)) {
-										$this->listChunks[$id] = [];
-										$isPrevNodeList = false;
-									}
-									// New chunk
-									if (! $isPrevNodeList) {
-										$chunk = count($this->listChunks[$id]);
-										$list = $this->createElement('list');
-										$list->setAttribute('id', $id.'_'.$chunk);
-										//$list->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getNumberingType()]);
-										$section->appendChild($list);
-										$this->listChunks[$id][$chunk] = &$list;
-										$this->lists[$id.'_'.$chunk] = &$list;
-									// Chunk found
-									} else {
-										$chunk = count($this->listChunks[$id]) - 1;
-										$list = &$this->listChunks[$id][$chunk];
-									}
-									// Update latest list types so they are available to other chunks where the first item is in a sublist
-									$type = $this->listLvlTypes[$id][$lvl] = self::JATS_LIST_TYPES[$content->getNumberingType()];
-
-									// TODO what is this comparison?
-									if ($iid === $lvl) {
-										// Search/Create sublists
-										for ($i=1; $i < $lvl; $i++) {
-											// Propagate list type useful in chunks when the first item is a subitem
-											if (isset($this->listLvlTypes[$id][$i]))
-												$list->setAttribute('list-type', $this->listLvlTypes[$id][$i]);
-											// Get sublist from last node
-											$k = &$list->lastChild;
-											if ($k == null) {
-												$k = $this->createElement('list-item');
-												$list->appendChild($k);
-											}
-											$l = &$k->lastChild;
-											// Create it otherwhise
-											if ($l == null || $l->nodeName != 'list') {
-												$l = $this->createElement('list');
-												$k->appendChild($l);
-											}
-											$list = &$l;
-										}
-										// Append the new item to the list
-										$listItem = $this->createElement('list-item');
-										$listItem->appendChild($jatsPar);
-										$jatsPar->setContent();
-										$list->appendChild($listItem);
-										// TODO find a way to do this only when needed
-										// Update list type to ensure that it's correct due to chunks
-										$list->setAttribute("list-type", $type);
-									}
-									$isPrevNodeList = true;
-								}
-							}
-						}
-						break;
-					case "docx2jats\objectModel\body\Table":
-						foreach ($sectionsOrBody as $section) {
-							if ($contentId === $section->getAttribute('id') || $section->nodeName === "body") {
-								$table = new JatsTable($content);
-								$section->appendChild($table);
-								$table->setContent();
-
-							}
-						}
-						break;
-					case "docx2jats\objectModel\body\Image":
-						foreach ($sectionsOrBody as $section) {
-							if ($contentId === $section->getAttribute('id') || $section->nodeName === "body") {
-								$figure = new JatsFigure($content);
-								$section->appendChild($figure);
-								$figure->setContent();
-							}
-						}
-						break;
+				// Append all content to each section
+				foreach ($sectionsOrBody as $section) {
+					if ($contentId === $section->getAttribute('id') || $section->nodeName === "body") {
+						$this->appendContent($content, $section);
+					}
 				}
-				try {
-					$isPrevNodeList = (in_array(Par::DOCX_PAR_LIST, $content->getType()) && !in_array(Par::DOCX_PAR_HEADING, $content->getType()));
-				} catch (\Throwable $th) {
-					// The node has no getType method
-					$isPrevNodeList = false;
-				}
-					
 			}
 		}
 	}
