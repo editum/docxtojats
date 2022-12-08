@@ -9,6 +9,18 @@ use docx2jats\objectModel\body\Table;
 use docx2jats\objectModel\DataObject;
 use DOMElement;
 
+
+// ooxml list types to jats types translation
+const JATS_LIST_TYPES = [
+    Par::DOCX_LIST_TYPE_SIMPLE => 'simple',
+    Par::DOCX_LIST_TYPE_UNORDERED => 'bullet',
+    Par::DOCX_LIST_TYPE_ORDERED => 'order',
+    Par::DOCX_LIST_TYPE_ALPHA_LOWER => 'alpha-lower',
+    Par::DOCX_LIST_TYPE_ALPHA_UPPER => 'alpha-upper',
+    Par::DOCX_LIST_TYPE_ROMAN_LOWER => 'lower-roman',
+    Par::DOCX_LIST_TYPE_ROMAN_UPPER => 'upper-roman',
+];
+
 /**
  * trait Container
  * Trait for elements which can act as container of other elements like a Ddocument or Table Cell.
@@ -16,17 +28,6 @@ use DOMElement;
 trait Container
 {
     protected $debug = true;
-
-    // TODO addclass for list definitions
-    public static $JATS_LIST_TYPES = [
-		Par::DOCX_LIST_TYPE_SIMPLE => 'simple',
-		Par::DOCX_LIST_TYPE_UNORDERED => 'bullet',
-		Par::DOCX_LIST_TYPE_ORDERED => 'order',
-		Par::DOCX_LIST_TYPE_ALPHA_LOWER => 'alpha-lower',
-		Par::DOCX_LIST_TYPE_ALPHA_UPPER => 'alpha-upper',
-		Par::DOCX_LIST_TYPE_ROMAN_LOWER => 'lower-roman',
-		Par::DOCX_LIST_TYPE_ROMAN_UPPER => 'upper-roman',
-	];
 
     /** @var bool Indicates wheter to start or not a new list, use by split-lists (chunks) */
     private $startList = true;
@@ -97,13 +98,13 @@ trait Container
                         $parent->appendChild($list);
                         $this->listChunks[$id][$chunk] = &$list;
                         $this->lists[$id.'_'.$chunk] = &$list;
-                    // Chunk found
+                    // Chunk foundself::$JATS_LIST_TYPES
                     } else {
                         $chunk = count($this->listChunks[$id]) - 1;
                         $list = &$this->listChunks[$id][$chunk];
                     }
                     // Update latest list types so they are available to other chunks where the first item is in a sublist
-                    $type = $this->listLvlTypes[$id][$lvl] = self::$JATS_LIST_TYPES[$content->getNumberingType()];
+                    $type = $this->listLvlTypes[$id][$lvl] = JATS_LIST_TYPES[$content->getNumberingType()];
 
                     // TODO what is this comparison?
                     if ($iid === $lvl) {
