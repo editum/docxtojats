@@ -49,7 +49,9 @@ class Cell extends DataObject {
 			$starts = $this->cellNumber;
 			$ends = $this->cellNumber + $this->colspan - 1;
 			foreach ($dummyCells as $pos) {
-				if ($starts <= $pos && $pos <= $ends) {
+				if ($ends < $pos) {
+					break;
+				} else if ($starts <= $pos) {
 					$this->prunedColspan--;
 				}
 			}
