@@ -9,7 +9,6 @@ use docx2jats\objectModel\body\Table;
 use docx2jats\objectModel\DataObject;
 use DOMElement;
 
-
 // ooxml list types to jats types translation
 const JATS_LIST_TYPES = [
     Par::DOCX_LIST_TYPE_SIMPLE => 'simple',

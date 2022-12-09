@@ -10,29 +10,11 @@
  */
 
 use docx2jats\DOCXArchive;
-use docx2jats\jats\Par as JatsPar;
-use docx2jats\objectModel\body\Par;
-use docx2jats\jats\JList as JatsList;
-use docx2jats\jats\Table as JatsTable;
-use docx2jats\jats\Figure as JatsFigure;
 use docx2jats\jats\traits\Container;
-use docx2jats\objectModel\body\Table;
-use docx2jats\objectModel\DataObject;
-use docx2jats\objectModel\Document as DOCXDocument;
 use DOMDocument;
 
-class Document extends \DOMDocument {
+class Document extends DOMDocument {
 	use Container;
-
-	const JATS_LIST_TYPES = [
-		Par::DOCX_LIST_TYPE_SIMPLE => 'simple',
-		Par::DOCX_LIST_TYPE_UNORDERED => 'bullet',
-		Par::DOCX_LIST_TYPE_ORDERED => 'order',
-		Par::DOCX_LIST_TYPE_ALPHA_LOWER => 'alpha-lower',
-		Par::DOCX_LIST_TYPE_ALPHA_UPPER => 'alpha-upper',
-		Par::DOCX_LIST_TYPE_ROMAN_LOWER => 'lower-roman',
-		Par::DOCX_LIST_TYPE_ROMAN_UPPER => 'upper-roman',
-	];
 
 	/* @var $docxArchive \docx2jats\DOCXArchive */
 	private $docxArchive;
