@@ -29,6 +29,10 @@ class Document {
 	private $content;
 	private static $minimalHeadingLevel;
 
+	/** @var \DOMDocument document metadata like tittle, language, etc */
+	private $metadata;
+	static $metadataXpath;
+
 	/* @var $relationships \DOMDocument contains relationships between document elements, e.g. the link and its target */
 	private $relationships;
 	static $relationshipsXpath;
@@ -69,28 +73,35 @@ class Document {
 	 */
 	public $bookMarks = array();
 
-	public function __construct(array $params) {
-		if (array_key_exists("partRelationships", $params)) {
-			$this->relationships = $params["partRelationships"];
+	public function __construct(\DOMDocument $ooxmlDocument, 
+			?\DOMDocument $metadata,
+			?\DOMDocument $partRelationships,
+			?\DOMDocument $styles,
+			?\DOMDocument $numbering,
+			?\DOMDocument $docPropsCustom) {
+
+		$this->metadata = $metadata;
+		if ($this->metadata)
+			self::$metadataXpath = new \DOMXPath($this->metadata);
+
+		$this->relationships = $partRelationships;
+		if ($this->relationships)
 			self::$relationshipsXpath = new \DOMXPath($this->relationships);
-		}
 
-		if (array_key_exists("styles", $params)) {
-			$this->styles = $params["styles"];
+		$this->styles = $styles;
+		if ($this->styles)
 			self::$stylesXpath = new \DOMXPath($this->styles);
-		}
 
-		if (array_key_exists("numbering", $params)) {
-			$this->numbering = $params["numbering"];
+		$this->numbering = $numbering;
+		if ($this->numbering)
 			self::$numberingXpath = new \DOMXPath($this->numbering);
-		}
 
-		if (array_key_exists("docPropsCustom", $params)) {
-			$this->docPropsCustom = $params["docPropsCustom"];
+		$this->docPropsCustom = $docPropsCustom;
+		if ($this->docPropsCustom)
 			self::$docPropsCustomXpath = new \DOMXPath($this->docPropsCustom);
-		}
 
-		self::$xpath = new \DOMXPath($params["ooxmlDocument"]);
+		$this->ooxmlDocument = $ooxmlDocument;
+		self::$xpath = new \DOMXPath($this->ooxmlDocument);
 		$this->findBookmarks();
 
 		$childNodes = self::$xpath->query("//w:body/child::node()");
