@@ -235,10 +235,11 @@ class Document {
 
 	/**
 	 * Returns from metadata: document's language
+	 * @param bool $primary if true returns the primary-language subtag
 	 * @return string
 	 */
-	public function getLanguage(): string {
-		return $this->language;
+	public function getLanguage(bool $primary = true): string {
+		return preg_replace('/-\w+$/', '', $this->language);
 	}
 
 	/**
