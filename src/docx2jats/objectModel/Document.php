@@ -25,6 +25,24 @@ class Document {
 	const DOCX_STYLES_NUMBERING = "numbering";
 	const DOCX_STYLES_TABLE = "table";
 
+	// Metadata
+	/** @var string */
+	private $creator = '';
+	/** @var string */
+	private $lastModifiedBy = '';
+	/** @var string */
+	private $language = '';
+	/** @var string */
+	private $revision = '';
+	/** @var string */
+	private $title = '';
+	/** @var string */
+	private $subject = '';
+	/** @var string */
+	private $description = '';
+	/** @var string */
+	private $keywords = '';
+
 	static $xpath;
 	private $content;
 	private static $minimalHeadingLevel;
@@ -81,8 +99,10 @@ class Document {
 			?\DOMDocument $docPropsCustom) {
 
 		$this->metadata = $metadata;
-		if ($this->metadata)
+		if ($this->metadata) {
 			self::$metadataXpath = new \DOMXPath($this->metadata);
+			$this->extractMetadata();
+		}
 
 		$this->relationships = $partRelationships;
 		if ($this->relationships)
@@ -104,10 +124,9 @@ class Document {
 		self::$xpath = new \DOMXPath($this->ooxmlDocument);
 		$this->findBookmarks();
 
-		$childNodes = self::$xpath->query("//w:body/child::node()");
-
 		$content = array();
 		$unUsedCaption = null;
+		$childNodes = self::$xpath->query("//w:body/child::node()");
 		foreach ($childNodes as $key => $childNode) {
 			// Assign block elements, i.e., Figures, Tables, Paragraphs, depending on the context
 			switch ($childNode->nodeName) {
@@ -199,6 +218,69 @@ class Document {
 	}
 
 	/**
+	 * Returns from metadata: the document creator.
+	 * @return string
+	 */
+	public function getCreator(): string {
+		return $this->creator;
+	}
+
+	/**
+	 * Returns from metadata: last user who modified the document.
+	 * @return string
+	 */
+	public function getLastModifiedBy(): string {
+		return $this->lastModifiedBy;
+	}
+
+	/**
+	 * Returns from metadata: document's language
+	 * @return string
+	 */
+	public function getLanguage(): string {
+		return $this->language;
+	}
+
+	/**
+	 * Returns from metadata: document's revision
+	 * @return string
+	 */
+	public function getRevision(): string {
+		return $this->revision;
+	}
+
+	/**
+	 * Returns from metadata: document's title
+	 * @return string
+	 */
+	public function getTitle(): string {
+		return $this->title;
+	}
+
+	/**
+	 * Returns from metadata: document's subject/subtitle
+	 * @return string
+	 */
+	public function getSubject(): string {
+		return $this->subject;
+	}
+
+	/**
+	 * Returns from metadata: document's description/abstract
+	 * @return string
+	 */
+	public function getDescription(): string {
+		return $this->description;
+	}
+
+	/**
+	 * Returns from metadata: raw keywords
+	 */
+	public function getKeywords(): string {
+		return $this->keywords;
+	}
+
+	/**
 	 * @return array
 	 */
 	public function getContent(): array {
@@ -246,6 +328,21 @@ class Document {
 		}
 
 		return $content;
+	}
+
+	/**
+	 * Extract metadata from docProps/core.xml
+	 */
+	private function extractMetadata() {
+		$xpath = self::$metadataXpath;
+		$this->creator = $xpath->evaluate('string(/cp:coreProperties/dc:creator)');
+		$this->lastModifiedBy = $xpath->evaluate('string(/cp:coreProperties/dc:lastModifiedBy)');
+		$this->language = $xpath->evaluate('string(/cp:coreProperties/dc:language)');
+		$this->revision = $xpath->evaluate('string(/cp:coreProperties/cp:revision)');
+		$this->title = $xpath->evaluate('string(/cp:coreProperties/dc:title)');
+		$this->subject = $xpath->evaluate('string(/cp:coreProperties/dc:subject)');
+		$this->description = $xpath->evaluate('string(/cp:coreProperties/dc:description)');
+		$this->keywords = $xpath->evaluate('string(/cp:coreProperties/cp:keywords)');
 	}
 
 	/**
