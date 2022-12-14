@@ -60,6 +60,9 @@ class Document extends DOMDocument {
 
 	private function setBasicStructure() {
 		$this->article = $this->createElement('article');
+		// Set language if any
+		if ($lang = $this->docxArchive->getDocument()->getLanguage())
+			$this->article->setAttribute('xml:lang', $lang);
 		$this->article->setAttributeNS(
 			"http://www.w3.org/2000/xmlns/",
 			"xmlns:xlink",
@@ -146,22 +149,50 @@ class Document extends DOMDocument {
 	}
 
 	private function extractMetadata() {
-		//TODO find and extract OOXML metadata
+		$document = $this->docxArchive->getDocument();
 
-		// Needed to make JATS XML document valid
-		$journalMetaNode = $this->createElement("journal-meta");
+		// In order to be a valid JATS xml the tags must be in the required order and some are obligatory
+		$journalMetaNode = $this->createElement('journal-meta');
 		$this->front->appendChild($journalMetaNode);
-		$journalIdNode = $this->createElement("journal-id");
+		$journalIdNode = $this->createElement('journal-id');
 		$journalMetaNode->appendChild($journalIdNode);
-		$issnNode = $this->createElement("issn");
+		$issnNode = $this->createElement('issn');
 		$journalMetaNode->appendChild($issnNode);
 
-		$articleMetaNode = $this->createElement("article-meta");
+		// Add metadata
+		$articleMetaNode = $this->createElement('article-meta');
 		$this->front->appendChild($articleMetaNode);
-		$titleGroupNode = $this->createElement("title-group");
+		//$articleMetaNode->appendChild($this->createElement('article-id'));
+
+		// Add version if any
+		if ($version = $document->getRevision())
+			$articleMetaNode->appendChild($this->createElement('article-version', $version));
+
+		// Add title
+		$titleGroupNode = $this->createElement('title-group');
 		$articleMetaNode->appendChild($titleGroupNode);
-		$articleTitleNode = $this->createElement("article-title");
-		$titleGroupNode->appendChild($articleTitleNode);
+		$titleGroupNode->appendChild($this->createElement('article-title', $document->getTitle()));
+
+		// Add subtitle if any
+		if ($subtitle = $document->getSubject())
+			$titleGroupNode->appendChild($this->createElement('subtitle', $subtitle));
+
+		$articleMetaNode->appendChild($this->createElement('permissions'));
+
+		// Add abstract if any
+		if ($description = $document->getDescription()) {
+			$abstractNode = $this->createElement('abstract');
+			$abstractNode->appendChild($this->createElement('p', $description));
+			$articleMetaNode->appendChild($abstractNode);
+		}
+		// Add keyowrds if any
+		if ($keywords = $document->getKeywords()) {
+			$kwdGroup = $this->createElement('kwd-group');
+			$kwdGroup->setAttribute('kwd-group-type', 'author');
+			$kwdGroup->appendChild($this->createElement('unstructured-kwd-group', $keywords));
+			$articleMetaNode->appendChild($kwdGroup);
+		}
+
 	}
 
 	private function extractReferences() : void {
