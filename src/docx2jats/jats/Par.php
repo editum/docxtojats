@@ -36,7 +36,6 @@ class Par extends Element {
 			if (get_class($content) === 'docx2jats\objectModel\body\Field') {
 				// Write links to references from Zotero and Mendeley plugin for MS Word
 				if ($content->getType() === Field::DOCX_FIELD_CSL) {
-					echo __CLASS__."::".__FUNCTION__."::".__LINE__." -> Referencia de Word de Zotero/Mendeley detectada\n";
 					$this->createCLSRef($content->getRefIds(), $content->getPlainCit());
 				}
 				// Write links to table and figures
@@ -59,7 +58,6 @@ class Par extends Element {
 				// Write links to references from Mendeley plugin for LibreOffice Writer
 				/* @var $content \docx2jats\objectModel\body\Text */
 				if ($content->hasCSLRefs) {
-					echo __CLASS__."::".__FUNCTION__."::".__LINE__." -> Referencia de Libreoffice Mendeley detectada\n";
 					$this->createCLSRef($content->refIds, $content->getContent());
 					// TODO todo esto de $prevTextRefs no le veo lógica, tampoco que se inserten de forma distinta a word, residual????
 					$currentRefs = $content->refIds;
@@ -93,7 +91,6 @@ class Par extends Element {
 
 		// APA and equivalents
 		if (preg_match(self::CLS_APA_COMPATIBLE, $plainCit)) {
-			echo "Detected APA: $plainCit\n";
 			$type = self::CLS_TYPE_APA_COMPATIBLE;
 			$separator = '; ';
 			if (count($refIds) > 1) {
@@ -111,7 +108,6 @@ class Par extends Element {
 		}
 		// IEEE '[4], [7]-[10]'
 		elseif (preg_match(self::CLS_IEEE, $plainCit)) {
-			echo "Detected IEEE $type: $plainCit\n";
 			$type = self::CLS_TYPE_IEEE;
 			$separator = ', ';
 			$format = '[%d]';
@@ -119,7 +115,6 @@ class Par extends Element {
 		// TODO AMA text is in superindex format
 		// AMA '4-10,5', Vancuver '(10,16–18,20)'
 		elseif (preg_match(self::CLS_AMA_COMPATIBLE, $plainCit)) {
-			echo "Detected AMA/Vancuver: $plainCit\n";
 			$type=self::CLS_TYPE_AMA_COMPATIBLE;
 			$separator = ',';
 			// Special case Vancuver
@@ -157,8 +152,6 @@ class Par extends Element {
 					break;
 			}
 
-			echo __CLASS__."::".__FUNCTION__."::".__LINE__." -> Escribiendo referencia ".$text."\n";
-		
 			// BUG: doesn't scape the text -> $refEl = $this->ownerDocument->createElement('xref', $text);
 			$refEl = $this->ownerDocument->createElement('xref');
 			$refEl->appendChild($this->ownerDocument->createTextNode($text));
@@ -167,7 +160,6 @@ class Par extends Element {
 			$this->appendChild($refEl);
 			// Insert separator between references
 			if ($key !== $lastKey) {
-				echo __CLASS__."::".__FUNCTION__."::".__LINE__." -> Insertando espaciador $separator\n";
 				$this->appendChild($this->ownerDocument->createTextNode($separator));
 			}
 		}
