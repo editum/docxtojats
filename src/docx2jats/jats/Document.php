@@ -10,24 +10,11 @@
  */
 
 use docx2jats\DOCXArchive;
-use docx2jats\jats\Par as JatsPar;
-use docx2jats\objectModel\body\Par;
-use docx2jats\jats\Table as JatsTable;
-use docx2jats\jats\Figure as JatsFigure;
-use docx2jats\objectModel\body\Table;
-use docx2jats\objectModel\DataObject;
-use docx2jats\objectModel\Document as DOCXDocument;
+use docx2jats\jats\traits\Container;
+use DOMDocument;
 
-class Document extends \DOMDocument {
-	const JATS_LIST_TYPES = [
-		Par::DOCX_LIST_TYPE_SIMPLE => 'simple',
-		Par::DOCX_LIST_TYPE_UNORDERED => 'bullet',
-		Par::DOCX_LIST_TYPE_ORDERED => 'order',
-		Par::DOCX_LIST_TYPE_ALPHA_LOWER => 'alpha-lower',
-		Par::DOCX_LIST_TYPE_ALPHA_UPPER => 'alpha-upper',
-		Par::DOCX_LIST_TYPE_ROMAN_LOWER => 'lower-roman',
-		Par::DOCX_LIST_TYPE_ROMAN_UPPER => 'upper-roman',
-	];
+class Document extends DOMDocument {
+	use Container;
 
 	/* @var $docxArchive \docx2jats\DOCXArchive */
 	private $docxArchive;
@@ -49,9 +36,6 @@ class Document extends \DOMDocument {
 
 	/* @var $references array of DOMElements */
 	var $references = array();
-
-	/* @var $lists array of DOMElements; contains all article's lists, key -> unique list ID, corresponds to ID in numbering.xml */
-	var $lists = array();
 
 	public function __construct(DOCXArchive $docxArchive) {
 		parent::__construct('1.0', 'utf-8');
@@ -76,6 +60,9 @@ class Document extends \DOMDocument {
 
 	private function setBasicStructure() {
 		$this->article = $this->createElement('article');
+		// Set language if any
+		if ($lang = $this->docxArchive->getDocument()->getLanguage())
+			$this->article->setAttribute('xml:lang', $lang);
 		$this->article->setAttributeNS(
 			"http://www.w3.org/2000/xmlns/",
 			"xmlns:xlink",
@@ -101,9 +88,9 @@ class Document extends \DOMDocument {
 			$latestSectionId = array();
 			$latestSections = array();
 
-			$subList = array(); // temporary container for sublists
 			$listItem = null; // temporary container for previous list item
-			$listCounter = -1; // temporary container for current list ID
+			$isPrevNodeList = false; // true when in list
+
 			foreach ($document->getContent() as $key => $content) {
 				$contentId = 'sec-' . implode('_', $content->getDimensionalSectionId());
 
@@ -138,78 +125,11 @@ class Document extends \DOMDocument {
 					$sectionsOrBody = $this->sections;
 				}
 
-				switch (get_class($content)) {
-
-					case "docx2jats\objectModel\body\Par":
-						/* @var $content Par */
-						$jatsPar = new JatsPar($content);
-
-						foreach ($sectionsOrBody as $section) {
-							if ($contentId === $section->getAttribute('id') || $section->nodeName === "body") {
-								if (!in_array(Par::DOCX_PAR_LIST, $content->getType())) {
-									$section->appendChild($jatsPar);
-									$jatsPar->setContent();
-								} elseif (!in_array(Par::DOCX_PAR_HEADING, $content->getType())) {
-									$itemId = $content->getNumberingItemProp()[Par::DOCX_LIST_ITEM_ID];
-									$hasSublist = $content->getNumberingItemProp()[Par::DOCX_LIST_HAS_SUBLIST];
-
-									// Creating and appending new list
-									// !array_key_exists... is necessary as there can be several lists with the same id, usually it's malformed doc
-									// TODO find a way to properly deal with numberings with the same id interrupted by simple regular paragraphs
-									if ($listCounter !== $content->getNumberingId()) {
-										$newList = $this->createElement('list');
-										$newList->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getNumberingType()]);
-										$this->lists[$content->getNumberingId()] = $newList;
-									}
-
-									$section->appendChild($this->lists[$content->getNumberingId()]);
-
-									// appends nested lists and list items based on their level
-									if (count($itemId) === $content->getNumberingLevel()+1) {
-										$listItem = $this->createElement('list-item');
-										$listItem->appendChild($jatsPar);
-										$jatsPar->setContent();
-
-										if ($content->getNumberingLevel() === 0) {
-											$this->lists[$content->getNumberingId()]->appendChild($listItem);
-										} elseif (array_key_exists($content->getNumberingLevel()-1, $subList)) {
-											$subList[$content->getNumberingLevel()-1]->appendChild($listItem);
-											// Append to first list level if user has set unrealistic level for nested items
-										} else {
-											$this->lists[$content->getNumberingId()]->appendChild($listItem);
-										}
-
-										if ($hasSublist) {
-											$subList[$content->getNumberingLevel()] = $this->createElement('list');
-											$subList[$content->getNumberingLevel()]->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getSubNumberingType()]);
-											$listItem->appendChild($subList[$content->getNumberingLevel()]);
-										}
-									}
-
-									// Refreshing list-item ID number
-									$listCounter = $content->getNumberingId();
-								}
-							}
-						}
-						break;
-					case "docx2jats\objectModel\body\Table":
-						foreach ($sectionsOrBody as $section) {
-							if ($contentId === $section->getAttribute('id') || $section->nodeName === "body") {
-								$table = new JatsTable($content);
-								$section->appendChild($table);
-								$table->setContent();
-
-							}
-						}
-						break;
-					case "docx2jats\objectModel\body\Image":
-						foreach ($sectionsOrBody as $section) {
-							if ($contentId === $section->getAttribute('id') || $section->nodeName === "body") {
-								$figure = new JatsFigure($content);
-								$section->appendChild($figure);
-								$figure->setContent();
-							}
-						}
+				// Append all content to each section
+				foreach ($sectionsOrBody as $section) {
+					if ($contentId === $section->getAttribute('id') || $section->nodeName === "body") {
+						$this->appendContent($content, $section);
+					}
 				}
 			}
 		}
@@ -229,22 +149,50 @@ class Document extends \DOMDocument {
 	}
 
 	private function extractMetadata() {
-		//TODO find and extract OOXML metadata
+		$document = $this->docxArchive->getDocument();
 
-		// Needed to make JATS XML document valid
-		$journalMetaNode = $this->createElement("journal-meta");
+		// In order to be a valid JATS xml the tags must be in the required order and some are obligatory
+		$journalMetaNode = $this->createElement('journal-meta');
 		$this->front->appendChild($journalMetaNode);
-		$journalIdNode = $this->createElement("journal-id");
+		$journalIdNode = $this->createElement('journal-id');
 		$journalMetaNode->appendChild($journalIdNode);
-		$issnNode = $this->createElement("issn");
+		$issnNode = $this->createElement('issn');
 		$journalMetaNode->appendChild($issnNode);
 
-		$articleMetaNode = $this->createElement("article-meta");
+		// Add metadata
+		$articleMetaNode = $this->createElement('article-meta');
 		$this->front->appendChild($articleMetaNode);
-		$titleGroupNode = $this->createElement("title-group");
+		//$articleMetaNode->appendChild($this->createElement('article-id'));
+
+		// Add version if any
+		if ($version = $document->getRevision())
+			$articleMetaNode->appendChild($this->createElement('article-version', $version));
+
+		// Add title
+		$titleGroupNode = $this->createElement('title-group');
 		$articleMetaNode->appendChild($titleGroupNode);
-		$articleTitleNode = $this->createElement("article-title");
-		$titleGroupNode->appendChild($articleTitleNode);
+		$titleGroupNode->appendChild($this->createElement('article-title', $document->getTitle()));
+
+		// Add subtitle if any
+		if ($subtitle = $document->getSubject())
+			$titleGroupNode->appendChild($this->createElement('subtitle', $subtitle));
+
+		$articleMetaNode->appendChild($this->createElement('permissions'));
+
+		// Add abstract if any
+		if ($description = $document->getDescription()) {
+			$abstractNode = $this->createElement('abstract');
+			$abstractNode->appendChild($this->createElement('p', $description));
+			$articleMetaNode->appendChild($abstractNode);
+		}
+		// Add keyowrds if any
+		if ($keywords = $document->getKeywords()) {
+			$kwdGroup = $this->createElement('kwd-group');
+			$kwdGroup->setAttribute('kwd-group-type', 'author');
+			$kwdGroup->appendChild($this->createElement('unstructured-kwd-group', $keywords));
+			$articleMetaNode->appendChild($kwdGroup);
+		}
+
 	}
 
 	private function extractReferences() : void {

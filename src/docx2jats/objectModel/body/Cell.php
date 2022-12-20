@@ -29,6 +29,9 @@ class Cell extends DataObject {
 	/* @var $cellNuber int */
 	private $cellNumber;
 
+	/* @var $prunedColspan */
+	private $prunedColspan;
+
 	public function __construct(\DOMElement $domElement, int $cellNumber, Document $ownerDocument, Row $parent) {
 		parent::__construct($domElement, $ownerDocument, $parent);
 
@@ -38,6 +41,21 @@ class Cell extends DataObject {
 		$this->extractRowspanNumber();
 		$this->paragraphs = $this->setParagraphs();
 		$this->properties = $this->setProperties('w:tcPr');
+
+		// Prune colspan when there is a dummycell between column start and colspan
+		$this->prunedColspan = $this->colspan;
+		if ($this->colspan > 1) {
+			$dummyCells = $this->getParent()->getParent()->getDummyCells();
+			$starts = $this->cellNumber;
+			$ends = $this->cellNumber + $this->colspan - 1;
+			foreach ($dummyCells as $pos) {
+				if ($ends < $pos) {
+					break;
+				} else if ($starts <= $pos) {
+					$this->prunedColspan--;
+				}
+			}
+		}
 	}
 
 	/**
@@ -130,8 +148,8 @@ class Cell extends DataObject {
 	/**
 	 * @return int
 	 */
-	public function getColspan(): int {
-		return $this->colspan;
+	public function getColspan(bool $prune = false): int {
+		return $prune ? $this->prunedColspan : $this->colspan;
 	}
 
 	/**

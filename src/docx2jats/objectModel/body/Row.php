@@ -28,24 +28,16 @@ class Row extends DataObject {
 		$content = array();
 		$contentNodes = $this->getXpath()->query($xpathExpression, $this->getDomElement());
 		if ($contentNodes->count() > 0) {
+			$cellNumber = 1;
 			foreach ($contentNodes as $contentNode) {
-
-				// calculating cell number
-				$cellNumber = 1;
-				$precedeSiblingNodes = $this->getXpath()->query('preceding-sibling::w:tc', $contentNode);
-				foreach ($precedeSiblingNodes as $precedeSiblingNode) {
-					$colspan = $this->getXpath()->query('w:tcPr/w:gridSpan/@w:val', $precedeSiblingNode);
-					if ($colspan->count() == 0 || empty($colspan)) {
-						$cellNumber ++;
-					} else {
-						$cellNumber += intval($colspan[0]->nodeValue);
-					}
-				}
 				// Omit merged nodes
 				$colspansMerged = $this->getXpath()->query('w:tcPr/w:vMerge[@w:val="continue"]', $contentNode);
 				if (!$colspansMerged->count() > 0) {
 					$cell = new Cell($contentNode, $cellNumber, $this->getOwnerDocument(), $this);
 					$content[] = $cell;
+					$cellNumber += $cell->getColspan();
+				} else {
+					$cellNumber++;
 				}
 			}
 		}

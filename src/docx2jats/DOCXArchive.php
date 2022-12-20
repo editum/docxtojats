@@ -14,6 +14,7 @@ use docx2jats\objectModel\Document;
 class DOCXArchive extends \ZipArchive {
 
 	public const CONTENT_TYPES_PATH = '[Content_Types].xml';
+	public const CONTENT_TYPE_METADATA = "application/vnd.openxmlformats-package.core-properties+xml";
 	public const CONTENT_TYPE_DOCUMENT_MAIN = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml';
 	public const CONTENT_TYPE_STYLES = 'application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml';
 	public const CONTENT_TYPE_SETTINGS = 'application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml';
@@ -45,6 +46,10 @@ class DOCXArchive extends \ZipArchive {
 			$this->contentType = $this->transformToXml(self::CONTENT_TYPES_PATH);
 			self::$contentTypeXpath = new \DOMXPath($this->contentType);
 
+			// Set Document metadata
+			$metadataPath = $this->getRealFileDocumentPath('docProps/core.xml', self::CONTENT_TYPE_METADATA);
+			$metadata = $this->transformToXml($metadataPath);
+
 			// Set the Main Document Part
 			$ooxmlDocumentPath = $this->getRealFileDocumentPath('word/document.xml', self::CONTENT_TYPE_DOCUMENT_MAIN);
 			$this->ooxmlDocument = $this->transformToXml($ooxmlDocumentPath);
@@ -69,19 +74,12 @@ class DOCXArchive extends \ZipArchive {
 			$docPropsCustom = $this->transformToXml($docPropsCustom);
 			$this->close();
 
-			// construct as an array
-			$params = array();
-
-			$params["ooxmlDocument"] = $this->ooxmlDocument;
-
-			if ($partRelationships) $params["partRelationships"] = $partRelationships;
-			if ($styles) $params["styles"] = $styles;
-			if ($numbering) $params["numbering"] = $numbering;
-			if ($docPropsCustom) $params["docPropsCustom"] = $docPropsCustom;
-
-			$document = new Document($params);
-
-			$this->document = $document;
+			$this->document = new Document($this->ooxmlDocument,
+				$metadata,
+				$partRelationships,
+				$styles,
+				$numbering,
+				$docPropsCustom);
 		}
 	}
 
