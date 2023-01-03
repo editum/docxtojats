@@ -11,6 +11,7 @@
 
 use docx2jats\objectModel\DataObject;
 use docx2jats\objectModel\body\Image as FigureObject;
+use docx2jats\jats\Graphic as JatsGraphic;
 
 class Figure extends Element {
 	const JATS_FIGURE_ID_PREFIX = 'fig';
@@ -24,11 +25,11 @@ class Figure extends Element {
 		$this->figureObject = $dataObject;
 	}
 
-	function setContent(string $prefix = null) {
+	function setContent() {
 		$dataObject = $this->getDataObject(); /* @var $dataObject \docx2jats\objectModel\body\Image */
 
 		if ($dataObject->getId()) {
-			$this->setAttribute('id', $prefix . self::JATS_FIGURE_ID_PREFIX . $dataObject->getId());
+			$this->setAttribute('id', self::JATS_FIGURE_ID_PREFIX . $dataObject->getId());
 		}
 
 		if ($dataObject->getLabel()) {
@@ -57,23 +58,8 @@ class Figure extends Element {
 			$captionNode->appendChild();
 		}
 
-		$figureNode = $this->ownerDocument->createElement('graphic');
+		$figureNode = new JatsGraphic($this->getDataObject());
 		$this->appendChild($figureNode);
-
-		$pathInfo = pathinfo($this->figureObject->getLink());
-
-		$figureNode->setAttribute("mimetype", "image");
-
-		switch ($pathInfo['extension']) {
-			case "jpg":
-			case "jpeg":
-				$figureNode->setAttribute("mime-subtype", "jpeg");
-				break;
-			case "png":
-				$figureNode->setAttribute("mime-subtype", "png");
-				break;
-		}
-
-		$figureNode->setAttribute("xlink:href", $pathInfo['basename']);
+		$figureNode->setContent();
 	}
 }

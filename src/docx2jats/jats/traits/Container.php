@@ -1,5 +1,6 @@
 <?php namespace docx2jats\jats\traits;
 
+use docx2jats\jats\Graphic as JatsGraphic;
 use docx2jats\jats\Figure as JatsFigure;
 use docx2jats\jats\Par as JatsPar;
 use docx2jats\jats\Table as JatsTable;
@@ -143,19 +144,24 @@ trait Container
                 break;
             // Tables
             case "docx2jats\objectModel\body\Table":
-                /** @var Table $content */
                 if ($this->debug) printf(" table\n");
-
+                /** @var Table $content */
                 $table = new JatsTable($content);
                 $parent->appendChild($table);
                 $table->setContent($pid);
                 break;
-            // Figures
+            // Figures, table cells only have graphic node
             case "docx2jats\objectModel\body\Image":
-                /** @var Image $content */
                 if ($this->debug) printf(" Image\n");
-
-                $figure = new JatsFigure($content);
+                /** @var Image $content */
+                switch (__CLASS__) {
+                    case 'docx2jats\jats\Cell':
+                        $figure = new JatsGraphic($content);
+                        break;
+                    default:
+                        $figure = new JatsFigure($content);
+                        break;
+                }
                 $parent->appendChild($figure);
                 $figure->setContent($pid);
                 break;

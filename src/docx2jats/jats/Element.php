@@ -14,7 +14,7 @@ use docx2jats\objectModel\body\Par;
 
 abstract class Element extends \DOMElement {
 
-	private $dataObject;
+	protected $dataObject;
 
 	public function __construct(DataObject $dataObject) {
 

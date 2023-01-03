@@ -11,8 +11,10 @@
 
 use docx2jats\objectModel\DataObject;
 use docx2jats\objectModel\Document;
+use docx2jats\objectModel\traits\Container;
 
 class Cell extends DataObject {
+	use Container;
 
 	private $properties = array();
 	private $paragraphs = array();
@@ -39,7 +41,7 @@ class Cell extends DataObject {
 		$this->isMerged = $this->defineMerged();
 		$this->colspan = $this->extractColspanNumber();
 		$this->extractRowspanNumber();
-		$this->paragraphs = $this->setParagraphs();
+		$this->paragraphs = $this->setContent($domElement);
 		$this->properties = $this->setProperties('w:tcPr');
 
 		// Prune colspan when there is a dummycell between column start and colspan
