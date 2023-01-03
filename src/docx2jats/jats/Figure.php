@@ -24,11 +24,11 @@ class Figure extends Element {
 		$this->figureObject = $dataObject;
 	}
 
-	function setContent() {
+	function setContent(string $prefix = null) {
 		$dataObject = $this->getDataObject(); /* @var $dataObject \docx2jats\objectModel\body\Image */
 
 		if ($dataObject->getId()) {
-			$this->setAttribute('id', self::JATS_FIGURE_ID_PREFIX . $dataObject->getId());
+			$this->setAttribute('id', $prefix . self::JATS_FIGURE_ID_PREFIX . $dataObject->getId());
 		}
 
 		if ($dataObject->getLabel()) {

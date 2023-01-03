@@ -46,16 +46,16 @@ trait Container
      * @param DOMElement $parent If null, this will be the parent
      * @param string $pid Parent id, if null it will try to get it from parent's attribute id
      */
-    public function appendContent(DataObject $content, DOMElement $parent = null, string $pid = null) {
+    private function appendContent(DataObject $content, DOMElement $parent = null, string $pid = null) {
         if ($this->debug) printf('['.__CLASS__.'::'.__FUNCTION__.'] ('.get_class($parent).') content type '.get_class($content));
 
         // Set parent and its id from attribute id if pid is not set
-        if (! $parent) {
+        if (! $parent)
             $parent = $this;
-        }
-        if (! $pid) {
+        if (! $pid)
             $pid = $parent->getAttribute('id');
-        }
+        if ($pid)
+            $pid.= '-';
 
         switch (get_class($content)) {
             // Paragraphs and lists
@@ -81,7 +81,7 @@ trait Container
                     $nid = $content->getNumberingId();
                     $lvl = $content->getNumberingLevel()+1;
                     $iid = count($content->getNumberingItemProp()[Par::DOCX_LIST_ITEM_ID]);
-                    $id = sprintf("%s-lst-%d", $pid, $nid);
+                    $id = sprintf("%slst%d", $pid, $nid);
 
                     // New list
                     if (! array_key_exists($id, $this->listChunks)) {
@@ -148,7 +148,7 @@ trait Container
 
                 $table = new JatsTable($content);
                 $parent->appendChild($table);
-                $table->setContent();
+                $table->setContent($pid);
                 break;
             // Figures
             case "docx2jats\objectModel\body\Image":
@@ -157,7 +157,7 @@ trait Container
 
                 $figure = new JatsFigure($content);
                 $parent->appendChild($figure);
-                $figure->setContent();
+                $figure->setContent($pid);
                 break;
             default:
                 if ($this->debug) printf(" not implemented yet\n");
