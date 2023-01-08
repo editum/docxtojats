@@ -145,14 +145,25 @@ trait Container
             // Tables
             case "docx2jats\objectModel\body\Table":
                 if ($this->debug) printf(" table\n");
+                // Tables in tables are wrapped in a paragraph
                 /** @var Table $content */
+                switch (__CLASS__) {
+                    case 'docx2jats\jats\Cell':
+                        $p = new DomElement('p');
+                        $parent->appendChild($p);
+                        break;
+                    default:
+                        $p = &$parent;
+                        break;
+                }
                 $table = new JatsTable($content);
-                $parent->appendChild($table);
+                $p->appendChild($table);
                 $table->setContent($pid);
                 break;
             // Figures, table cells only have graphic node
             case "docx2jats\objectModel\body\Image":
                 if ($this->debug) printf(" Image\n");
+                // Imagtes in a cell are not figures
                 /** @var Image $content */
                 switch (__CLASS__) {
                     case 'docx2jats\jats\Cell':
