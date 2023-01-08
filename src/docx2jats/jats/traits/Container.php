@@ -27,7 +27,7 @@ const JATS_LIST_TYPES = [
  */
 trait Container
 {
-    protected $debug = true;
+    protected $debug = false;
 
     /** @var bool Indicates wheter to start or not a new list, use by split-lists (chunks) */
     private $startList = true;

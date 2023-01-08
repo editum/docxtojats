@@ -55,6 +55,7 @@ class Figure extends Element {
 					$title->appendChild($refEl);
 				}
 			}
+			// TODO bug??
 			$captionNode->appendChild();
 		}
 
