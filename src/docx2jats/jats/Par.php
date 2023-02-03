@@ -101,7 +101,6 @@ class Par extends Element {
 				}
 				// Get every citation so they can be referenced later
 				$arrCit = explode($separator, trim($plainCit, '()'));
-				var_dump($arrCit);
 			} else {
 				$arrCit = [ $plainCit ];
 			}

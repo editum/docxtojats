@@ -55,8 +55,7 @@ class Figure extends Element {
 					$title->appendChild($refEl);
 				}
 			}
-			// TODO bug??
-			$captionNode->appendChild();
+			$captionNode->appendChild($title);
 		}
 
 		$figureNode = new JatsGraphic($this->getDataObject());
