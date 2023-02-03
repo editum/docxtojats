@@ -20,7 +20,7 @@ class Table extends Element {
 		parent::__construct($dataObject);
 	}
 
-	public function setContent() {
+	public function setContent(string $prefix = null) {
 		/**
 		 * TODO Table, Figure and Formula have the same caption, id and label elements handling,
 		 * consider ancestor class or trait
@@ -28,7 +28,7 @@ class Table extends Element {
 		$dataObject = $this->getDataObject(); /* @var $dataObject \docx2jats\objectModel\body\Table */
 
 		if ($dataObject->getId()) {
-			$this->setAttribute('id', self::JATS_TABLE_ID_PREFIX . $dataObject->getId());
+			$this->setAttribute('id', $prefix . self::JATS_TABLE_ID_PREFIX . $dataObject->getId());
 		}
 
 		if ($dataObject->getLabel()) {

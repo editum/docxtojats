@@ -1,5 +1,6 @@
 <?php namespace docx2jats\jats\traits;
 
+use docx2jats\jats\Graphic as JatsGraphic;
 use docx2jats\jats\Figure as JatsFigure;
 use docx2jats\jats\Par as JatsPar;
 use docx2jats\jats\Table as JatsTable;
@@ -46,16 +47,16 @@ trait Container
      * @param DOMElement $parent If null, this will be the parent
      * @param string $pid Parent id, if null it will try to get it from parent's attribute id
      */
-    public function appendContent(DataObject $content, DOMElement $parent = null, string $pid = null) {
+    private function appendContent(DataObject $content, DOMElement $parent = null, string $pid = null) {
         if ($this->debug) printf('['.__CLASS__.'::'.__FUNCTION__.'] ('.get_class($parent).') content type '.get_class($content));
 
         // Set parent and its id from attribute id if pid is not set
-        if (! $parent) {
+        if (! $parent)
             $parent = $this;
-        }
-        if (! $pid) {
+        if (! $pid)
             $pid = $parent->getAttribute('id');
-        }
+        if ($pid)
+            $pid.= '-';
 
         switch (get_class($content)) {
             // Paragraphs and lists
@@ -81,7 +82,7 @@ trait Container
                     $nid = $content->getNumberingId();
                     $lvl = $content->getNumberingLevel()+1;
                     $iid = count($content->getNumberingItemProp()[Par::DOCX_LIST_ITEM_ID]);
-                    $id = sprintf("%s-lst-%d", $pid, $nid);
+                    $id = sprintf("%slst%d", $pid, $nid);
 
                     // New list
                     if (! array_key_exists($id, $this->listChunks)) {
@@ -143,21 +144,37 @@ trait Container
                 break;
             // Tables
             case "docx2jats\objectModel\body\Table":
-                /** @var Table $content */
                 if ($this->debug) printf(" table\n");
-
+                // Tables in tables are wrapped in a paragraph
+                /** @var Table $content */
+                switch (__CLASS__) {
+                    case 'docx2jats\jats\Cell':
+                        $p = new DomElement('p');
+                        $parent->appendChild($p);
+                        break;
+                    default:
+                        $p = &$parent;
+                        break;
+                }
                 $table = new JatsTable($content);
-                $parent->appendChild($table);
-                $table->setContent();
+                $p->appendChild($table);
+                $table->setContent($pid);
                 break;
-            // Figures
+            // Figures, table cells only have graphic node
             case "docx2jats\objectModel\body\Image":
-                /** @var Image $content */
                 if ($this->debug) printf(" Image\n");
-
-                $figure = new JatsFigure($content);
+                // Imagtes in a cell are not figures
+                /** @var Image $content */
+                switch (__CLASS__) {
+                    case 'docx2jats\jats\Cell':
+                        $figure = new JatsGraphic($content);
+                        break;
+                    default:
+                        $figure = new JatsFigure($content);
+                        break;
+                }
                 $parent->appendChild($figure);
-                $figure->setContent();
+                $figure->setContent($pid);
                 break;
             default:
                 if ($this->debug) printf(" not implemented yet\n");

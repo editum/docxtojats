@@ -15,8 +15,13 @@ use docx2jats\objectModel\body\Par;
 use docx2jats\objectModel\body\Table;
 use docx2jats\objectModel\body\Image;
 use docx2jats\objectModel\body\Reference;
+use docx2jats\objectModel\Document as ObjectModelDocument;
+use docx2jats\objectModel\traits\Container;
+use DOMXPath;
 
 class Document {
+	use Container;
+
 	const SECT_NESTED_LEVEL_LIMIT = 5; // limit the number of possible levels for sections
 
 	// Represent styling for OOXMl structure elements
@@ -124,97 +129,84 @@ class Document {
 		self::$xpath = new \DOMXPath($this->ooxmlDocument);
 		$this->findBookmarks();
 
-		$content = array();
-		$unUsedCaption = null;
-		$childNodes = self::$xpath->query("//w:body/child::node()");
-		foreach ($childNodes as $key => $childNode) {
-			// Assign block elements, i.e., Figures, Tables, Paragraphs, depending on the context
-			switch ($childNode->nodeName) {
-				case "w:p":
-					/**
-					 * TODO add support for other drawings type, e.g., c:chart
-					 * Figures are contained inside paragraphs, particularly - in text runs;
-					 * there may be several images each inside own text run.
-					 * In addition, LibreOffice Writer's DOCX export includes 2 duplicates of drawings for compatibility reasons
-					 */
-					if ($this->isDrawing($childNode)) {
-						$drawingEls = null;
-						$textRuns = self::$xpath->query('w:r', $childNode);
-						foreach ($textRuns as $textRun) {
-							// Retrieve only first one (LibreOffice Writer duplicates with a fallback option
-							$checkDrawingEl = self::$xpath->query('.//w:drawing[1]', $textRun)[0];
-							if ($checkDrawingEl) $drawingEls[] = $checkDrawingEl;
-						}
-						if (empty($drawingEls)) break;
-
-						foreach ($drawingEls as $drawingEl) {
-							// check if contains image, charts aren't supported
-							self::$xpath->registerNamespace("pic", "http://schemas.openxmlformats.org/drawingml/2006/picture");
-							$imageNodes = self::$xpath->query(".//pic:pic", $drawingEl);
-							if ($imageNodes->length === 0) break;
-
-							$figure = new Image($drawingEl, $this);
-							$content[] = $figure;
-
-							// Get coordinates for this figure
-							$this->elsAreFigures[] = count($content) - 1;
-
-							// Set unique ID
-							$figure->setFigureId($this->currentFigureId++);
-
-							// Set caption if exists
-							if ($unUsedCaption) {
-								$figure->setCaption($unUsedCaption);
-								$unUsedCaption = null;
-							}
-						}
-
-					} elseif ($this->isCaption($childNode)) {
-						// Check if previous node is drawing or table
-						if (!empty($content)) { // may be empty if caption is the first element
-							$prevObject =& $content[array_key_last($content)];
-						}
-
-						if (isset($prevObject) && (get_class($prevObject) === 'docx2jats\objectModel\body\Table' || get_class($prevObject) === 'docx2jats\objectModel\body\Image')) {
-							$prevObject->setCaption($childNode);
-						} else {
-							$unUsedCaption = $childNode;
-						}
-					} else {
-						$par = new Par($childNode, $this);
-						if (in_array(Par::DOCX_PAR_REF, $par->getType())) {
-							if (!empty(trim($par->toString()))) {
-								$reference = new Reference($par->toString());
-								$this->addReference($reference);
-							}
-						} else {
-							$content[] = $par;
-						}
-
-						if ($par->hasBookmarks) {
-							$this->elsHavefldCharRefs[] = count($content)-1;
-						}
-					}
-					break;
-				case "w:tbl":
-					$table = new Table($childNode, $this);
-					$content[] = $table;
-					$this->elsAreTables[] = count($content)-1;
-
-					// Set unique ID
-					$table->setTableId($this->currentTableId++);
-					// Set caption if exists
-					if ($unUsedCaption) {
-						$table->setCaption($unUsedCaption);
-						$unUsedCaption = null;
-					}
-					break;
-			}
-		}
-
+		$content = $this->setContent(self::$xpath->query('//w:body')[0]);
 		$this->content = $this->addSectionMarks($content);
 		self::$minimalHeadingLevel = $this->minimalHeadingLevel();
 		$this->setInternalRefs();
+	}
+
+	private function getXpath(): DOMXPath
+	{
+		return self::$xpath;
+	}
+
+	public function getOwnerDocument(): ?Document
+	{
+		return $this;
+	}
+
+	/**
+	 * Returns from metadata: the document creator.
+	 * @return string
+	 */
+	public function getCreator(): string {
+		return $this->creator;
+	}
+
+	/**
+	 * Returns from metadata: last user who modified the document.
+	 * @return string
+	 */
+	public function getLastModifiedBy(): string {
+		return $this->lastModifiedBy;
+	}
+
+	/**
+	 * Returns from metadata: document's language
+	 * @param bool $primary if true returns the primary-language subtag
+	 * @return string
+	 */
+	public function getLanguage(bool $primary = true): string {
+		return preg_replace('/-\w+$/', '', $this->language);
+	}
+
+	/**
+	 * Returns from metadata: document's revision
+	 * @return string
+	 */
+	public function getRevision(): string {
+		return $this->revision;
+	}
+
+	/**
+	 * Returns from metadata: document's title
+	 * @return string
+	 */
+	public function getTitle(): string {
+		return $this->title;
+	}
+
+	/**
+	 * Returns from metadata: document's subject/subtitle
+	 * @return string
+	 */
+	public function getSubject(): string {
+		return $this->subject;
+	}
+
+	/**
+	 * Returns from metadata: document's description/abstract
+	 * @return string
+	 */
+	public function getDescription(): string {
+		return $this->description;
+	}
+
+	/**
+	 * Returns from metadata: raw keywords
+	 */
+	public function getKeywords(): string {
+		return $this->keywords;
 	}
 
 	/**
@@ -407,29 +399,6 @@ class Document {
 			if (in_array($id, $builtinStyles)) return $id;
 			else return null;
 		}
-	}
-
-
-	private function isDrawing($childNode): bool {
-		$element = Document::$xpath->query("w:r//w:drawing", $childNode)[0];
-		if ($element) return true;
-		return false;
-	}
-
-	/**
-	 * @param $childNode
-	 * @return bool
-	 * @brief determines if an element is caption
-	 */
-	function isCaption($childNode): bool {
-		$elementStyle = Document::$xpath->query("w:pPr/w:pStyle/@w:val", $childNode)[0];
-		if (is_null($elementStyle)) return false;
-
-		if (Document::getBuiltinStyle(Document::DOCX_STYLES_PARAGRAPH, $elementStyle->nodeValue, Table::$caption)) {
-			return true;
-		}
-
-		return false;
 	}
 
 	/**
