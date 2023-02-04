@@ -154,6 +154,7 @@ trait Container
                     if ($this->debug) printf(" anything else\n");
                 }
                 break;
+            // NOTE: to not break link references to a table or figure in root document, their id must be not prefixed
             // Tables
             case "docx2jats\objectModel\body\Table":
                 if ($this->debug) printf(" table\n");
@@ -163,14 +164,16 @@ trait Container
                     case 'docx2jats\jats\Cell':
                         $p = new DomElement('p');
                         $parent->appendChild($p);
+                        $prefix = $pid;
                         break;
                     default:
                         $p = &$parent;
+                        $prefix = null;
                         break;
                 }
                 $table = new JatsTable($content);
                 $p->appendChild($table);
-                $table->setContent($pid);
+                $table->setContent($prefix);
                 break;
             // Figures, table cells only have graphic node
             case "docx2jats\objectModel\body\Image":
@@ -180,13 +183,15 @@ trait Container
                 switch (__CLASS__) {
                     case 'docx2jats\jats\Cell':
                         $figure = new JatsGraphic($content);
+                        $prefix = $pid;
                         break;
                     default:
                         $figure = new JatsFigure($content);
+                        $prefix = null;
                         break;
                 }
                 $parent->appendChild($figure);
-                $figure->setContent($pid);
+                $figure->setContent($prefix);
                 break;
             default:
                 if ($this->debug) printf(" not implemented yet\n");
