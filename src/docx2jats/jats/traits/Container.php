@@ -32,6 +32,9 @@ trait Container
     /** @var bool Indicates wheter to start or not a new list, use by split-lists (chunks) */
     private $startList = true;
 
+    /** @var string Last used list used to mitigate mismatch sublist id when they are inside a differten parent list */
+    private $lastListId = null;
+
     /** @var DOMElement[] It doesn't serve any purpose but keep track of all list */
     private $lists = [];
 
@@ -83,6 +86,7 @@ trait Container
                     $lvl = $content->getNumberingLevel()+1;
                     $iid = count($content->getNumberingItemProp()[Par::DOCX_LIST_ITEM_ID]);
                     $id = sprintf("%slst%d", $pid, $nid);
+                    $rectifiedId = $id;
 
                     // New list
                     if (! array_key_exists($id, $this->listChunks)) {
@@ -98,10 +102,17 @@ trait Container
                         $parent->appendChild($list);
                         $this->listChunks[$id][$chunk] = &$list;
                         $this->lists[$id.'_'.$chunk] = &$list;
-                    // Chunk foundself::$JATS_LIST_TYPES
+                    // Chunk found self::$JATS_LIST_TYPES
                     } else {
-                        $chunk = count($this->listChunks[$id]) - 1;
-                        $list = &$this->listChunks[$id][$chunk];
+                        // Detect item list id mismatch when a item has different id than the "apparent" list, but try to keep styles
+                        if ($this->lastListId && $this->lastListId != $id)
+                        {
+                            $rectifiedId = $this->lastListId;
+                            if ($this->debug) printf("[%s::%s] Rectified list from id %s to %s\n", __CLASS__, __FUNCTION__, $id, $this->lastListId);
+                        }
+                        // Must use the rectified list id
+                        $chunk = count($this->listChunks[$rectifiedId]) - 1;
+                        $list = &$this->listChunks[$rectifiedId][$chunk];
                     }
                     // Update latest list types so they are available to other chunks where the first item is in a sublist
                     $type = $this->listLvlTypes[$id][$lvl] = JATS_LIST_TYPES[$content->getNumberingType()];
@@ -138,6 +149,7 @@ trait Container
                         $par->setContent();
                     }
                     $this->startList = false;
+                    $this->lastListId = $rectifiedId;
                 } else {
                     if ($this->debug) printf(" anything else\n");
                 }
