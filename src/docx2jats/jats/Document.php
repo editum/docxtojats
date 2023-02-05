@@ -92,7 +92,7 @@ class Document extends DOMDocument {
 			$isPrevNodeList = false; // true when in list
 
 			foreach ($document->getContent() as $key => $content) {
-				$contentId = 'sec-' . implode('_', $content->getDimensionalSectionId());
+				$contentId = 'sec' . implode('_', $content->getDimensionalSectionId());
 
 				// Appending section, must correspond section nested level; TODO optimize with recursion
 				if ($content->getDimensionalSectionId() !== $latestSectionId) {

@@ -60,10 +60,12 @@ class Table extends Element {
 
 		$tableNode = $this->ownerDocument->createElement('table');
 		$this->appendChild($tableNode);
+		$tbodyNode = $this->ownerDocument->createElement('tbody');
+		$tableNode->appendChild($tbodyNode);
 
 		foreach ($dataObject->getContent() as $content) {
 			$row = new JatsRow($content);
-			$tableNode->appendChild($row);
+			$tbodyNode->appendChild($row);
 			$row->setContent();
 		}
 	}

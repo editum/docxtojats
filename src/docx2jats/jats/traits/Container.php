@@ -20,6 +20,7 @@ const JATS_LIST_TYPES = [
     Par::DOCX_LIST_TYPE_ROMAN_LOWER => 'lower-roman',
     Par::DOCX_LIST_TYPE_ROMAN_UPPER => 'upper-roman',
 ];
+const JATS_LIST_TYPE_DEFAULT = JATS_LIST_TYPES[Par::DOCX_LIST_TYPE_UNORDERED];
 
 /**
  * trait Container
@@ -31,6 +32,9 @@ trait Container
 
     /** @var bool Indicates wheter to start or not a new list, use by split-lists (chunks) */
     private $startList = true;
+
+    /** @var string Last used list used to mitigate mismatch sublist id when they are inside a differten parent list */
+    private $lastListId = null;
 
     /** @var DOMElement[] It doesn't serve any purpose but keep track of all list */
     private $lists = [];
@@ -83,6 +87,7 @@ trait Container
                     $lvl = $content->getNumberingLevel()+1;
                     $iid = count($content->getNumberingItemProp()[Par::DOCX_LIST_ITEM_ID]);
                     $id = sprintf("%slst%d", $pid, $nid);
+                    $rectifiedId = $id;
 
                     // New list
                     if (! array_key_exists($id, $this->listChunks)) {
@@ -94,14 +99,21 @@ trait Container
                         $chunk = count($this->listChunks[$id]);
                         $list = $doc->createElement('list');
                         $list->setAttribute('id', $id.'_'.$chunk);
-                        //$list->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getNumberingType()]);
+                        $list->setAttribute('list-type', JATS_LIST_TYPE_DEFAULT);
                         $parent->appendChild($list);
                         $this->listChunks[$id][$chunk] = &$list;
                         $this->lists[$id.'_'.$chunk] = &$list;
-                    // Chunk foundself::$JATS_LIST_TYPES
+                    // Chunk found self::$JATS_LIST_TYPES
                     } else {
-                        $chunk = count($this->listChunks[$id]) - 1;
-                        $list = &$this->listChunks[$id][$chunk];
+                        // Detect item list id mismatch when a item has different id than the "apparent" list, but try to keep styles
+                        if ($this->lastListId && $this->lastListId != $id)
+                        {
+                            $rectifiedId = $this->lastListId;
+                            if ($this->debug) printf("[%s::%s] Rectified list from id %s to %s\n", __CLASS__, __FUNCTION__, $id, $this->lastListId);
+                        }
+                        // Must use the rectified list id
+                        $chunk = count($this->listChunks[$rectifiedId]) - 1;
+                        $list = &$this->listChunks[$rectifiedId][$chunk];
                     }
                     // Update latest list types so they are available to other chunks where the first item is in a sublist
                     $type = $this->listLvlTypes[$id][$lvl] = JATS_LIST_TYPES[$content->getNumberingType()];
@@ -123,6 +135,7 @@ trait Container
                             // Create it otherwhise
                             if ($l == null || $l->nodeName != 'list') {
                                 $l = $doc->createElement('list');
+                                $l->setAttribute('list-type', JATS_LIST_TYPE_DEFAULT);
                                 $k->appendChild($l);
                             }
                             $list = &$l;
@@ -138,10 +151,12 @@ trait Container
                         $par->setContent();
                     }
                     $this->startList = false;
+                    $this->lastListId = $rectifiedId;
                 } else {
                     if ($this->debug) printf(" anything else\n");
                 }
                 break;
+            // NOTE: to not break link references to a table or figure in root document, their id must be not prefixed
             // Tables
             case "docx2jats\objectModel\body\Table":
                 if ($this->debug) printf(" table\n");
@@ -151,14 +166,16 @@ trait Container
                     case 'docx2jats\jats\Cell':
                         $p = new DomElement('p');
                         $parent->appendChild($p);
+                        $prefix = $pid;
                         break;
                     default:
                         $p = &$parent;
+                        $prefix = null;
                         break;
                 }
                 $table = new JatsTable($content);
                 $p->appendChild($table);
-                $table->setContent($pid);
+                $table->setContent($prefix);
                 break;
             // Figures, table cells only have graphic node
             case "docx2jats\objectModel\body\Image":
@@ -168,13 +185,15 @@ trait Container
                 switch (__CLASS__) {
                     case 'docx2jats\jats\Cell':
                         $figure = new JatsGraphic($content);
+                        $prefix = $pid;
                         break;
                     default:
                         $figure = new JatsFigure($content);
+                        $prefix = null;
                         break;
                 }
                 $parent->appendChild($figure);
-                $figure->setContent($pid);
+                $figure->setContent($prefix);
                 break;
             default:
                 if ($this->debug) printf(" not implemented yet\n");
