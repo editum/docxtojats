@@ -20,6 +20,7 @@ const JATS_LIST_TYPES = [
     Par::DOCX_LIST_TYPE_ROMAN_LOWER => 'lower-roman',
     Par::DOCX_LIST_TYPE_ROMAN_UPPER => 'upper-roman',
 ];
+const JATS_LIST_TYPE_DEFAULT = JATS_LIST_TYPES[Par::DOCX_LIST_TYPE_UNORDERED];
 
 /**
  * trait Container
@@ -98,7 +99,7 @@ trait Container
                         $chunk = count($this->listChunks[$id]);
                         $list = $doc->createElement('list');
                         $list->setAttribute('id', $id.'_'.$chunk);
-                        //$list->setAttribute("list-type", self::JATS_LIST_TYPES[$content->getNumberingType()]);
+                        $list->setAttribute('list-type', JATS_LIST_TYPE_DEFAULT);
                         $parent->appendChild($list);
                         $this->listChunks[$id][$chunk] = &$list;
                         $this->lists[$id.'_'.$chunk] = &$list;
@@ -134,6 +135,7 @@ trait Container
                             // Create it otherwhise
                             if ($l == null || $l->nodeName != 'list') {
                                 $l = $doc->createElement('list');
+                                $l->setAttribute('list-type', JATS_LIST_TYPE_DEFAULT);
                                 $k->appendChild($l);
                             }
                             $list = &$l;
