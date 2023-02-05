@@ -34,6 +34,9 @@ class Cell extends DataObject {
 	/* @var $prunedColspan */
 	private $prunedColspan;
 
+	/* @var $align */
+	private $align = 'left';
+
 	public function __construct(\DOMElement $domElement, int $cellNumber, Document $ownerDocument, Row $parent) {
 		parent::__construct($domElement, $ownerDocument, $parent);
 
@@ -41,6 +44,7 @@ class Cell extends DataObject {
 		$this->isMerged = $this->defineMerged();
 		$this->colspan = $this->extractColspanNumber();
 		$this->extractRowspanNumber();
+		$this->extractAlign();
 		$this->paragraphs = $this->setContent($domElement);
 		$this->properties = $this->setProperties('w:tcPr');
 
@@ -60,6 +64,10 @@ class Cell extends DataObject {
 		}
 	}
 
+	public function getAlign(): string {
+		return $this->align;
+	}
+
 	/**
 	 * @return bool
 	 */
@@ -71,6 +79,26 @@ class Cell extends DataObject {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Extracts the cell align value.
+	 */
+	private function extractAlign(): void {
+		//$align = $this->getXpath()->query('w:p/w:pPr/w:jc[@w:val]/@w:val', $this->getDomElement())->item(0);
+		$align = $this->getXpath()->evaluate('string(./w:p/w:pPr/w:jc[@w:val]/@w:val)', $this->getDomElement());
+		switch ($align) {
+			case null:
+			case '':
+				$this->align = 'left';
+				break;
+			case 'both':
+				$this->align = 'justify';
+				break;
+			default:
+				$this->align = $align;
+				break;
+		}
 	}
 
 	/**

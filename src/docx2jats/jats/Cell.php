@@ -23,15 +23,13 @@ class Cell extends Element {
 	public function setContent() {
 		/** @var BodyCell $dataObject */
 		$dataObject = $this->getDataObject();
+		$this->setAttribute('align', $dataObject->getAlign());
 		$colspan = $dataObject->getColspan(true);
-		$rowspan = $dataObject->getRowspan();
-		if ($colspan > 1) {
+		if ($colspan > 1)
 			$this->setAttribute('colspan', $colspan);
-		}
-
-		if ($rowspan > 1) {
+		$rowspan = $dataObject->getRowspan();
+		if ($rowspan > 1)
 			$this->setAttribute('rowspan', $rowspan);
-		}
 
 		// $this->tr->tbody->table->tablewrap->getAttribute('id')
 		@$tid = $this->parentNode->parentNode->parentNode->parentNode->getAttribute('id');
