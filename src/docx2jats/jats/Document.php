@@ -16,6 +16,13 @@ use DOMDocument;
 class Document extends DOMDocument {
 	use Container;
 
+	const DOCUMENT_PUBLICID = "-//NLM//DTD JATS (Z39.96) Journal Publishing DTD v1.1 20151215//EN";
+	const DOCUMENT_SYSTEMID = "https://jats.nlm.nih.gov/publishing/1.1/JATS-journalpublishing1.dtd";
+	const ARTICLE_ATTRIBUTES = [
+		'dtd-version' => '1.1',
+		'specific-use' => 'sps-1.9',
+	];
+
 	/* @var $docxArchive \docx2jats\DOCXArchive */
 	private $docxArchive;
 
@@ -45,7 +52,7 @@ class Document extends DOMDocument {
 
 		// Doctype
 		$impl = new \DOMImplementation();
-		$this->appendChild($impl->createDocumentType("article", "-//NLM//DTD JATS (Z39.96) Journal Publishing DTD v1.2 20190208//EN", "https://jats.nlm.nih.gov/publishing/1.2/JATS-journalpublishing1.dtd"));
+		$this->appendChild($impl->createDocumentType("article", self::DOCUMENT_PUBLICID, self::DOCUMENT_SYSTEMID));
 
 		$this->setBasicStructure();
 		$this->extractContent();
@@ -68,6 +75,8 @@ class Document extends DOMDocument {
 			"xmlns:xlink",
 			"http://www.w3.org/1999/xlink"
 		);
+		foreach (self::ARTICLE_ATTRIBUTES as $key => $value)
+			$this->article->setAttribute($key, $value);
 
 		$this->appendChild($this->article);
 
