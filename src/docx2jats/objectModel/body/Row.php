@@ -31,13 +31,13 @@ class Row extends DataObject {
 			$cellNumber = 1;
 			foreach ($contentNodes as $contentNode) {
 				// Omit merged nodes
-				$colspansMerged = $this->getXpath()->query('w:tcPr/w:vMerge[@w:val="continue"]', $contentNode);
-				if (!$colspansMerged->count() > 0) {
+				$colspansMerged = $this->getXpath()->query('w:tcPr/w:vMerge', $contentNode);
+				if ($colspansMerged->count() > 0 && (! $colspansMerged[0]->hasAttribute('w:val') || $colspansMerged[0]->getAttribute('w:val') == 'continue')) {
+					$cellNumber++;
+				} else {
 					$cell = new Cell($contentNode, $cellNumber, $this->getOwnerDocument(), $this);
 					$content[] = $cell;
 					$cellNumber += $cell->getColspan();
-				} else {
-					$cellNumber++;
 				}
 			}
 		}
