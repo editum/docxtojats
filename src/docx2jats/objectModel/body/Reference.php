@@ -13,6 +13,7 @@ class Reference {
 	private $id;
 	private $cslId;
 	private $csl;
+	private $bibliography;
 	public $isZoteroCSL = false;
 	private $hasStructure = false;
 
@@ -25,12 +26,23 @@ class Reference {
 		}
 	}
 
+	public function getBibliography(): ?string {
+		return $this->bibliography;
+	}
+
 	/**
 	 * @return int
 	 */
 	public function getCslId(): string
 	{
 		return $this->cslId;
+	}
+
+	/**
+	 * Setted by the document after post-processing all the references
+	 */
+	public function setBibliography(string $bibliography) {
+		$this->bibliography = $bibliography;
 	}
 
 	/**

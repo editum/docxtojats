@@ -45,7 +45,6 @@ class Reference extends \DOMElement {
 			$mixedCitationEl->appendChild($textContent);
 			$this->appendChild($mixedCitationEl);
 		}
-
 		else {
 			$this->setStructure($reference);
 		}
@@ -53,76 +52,22 @@ class Reference extends \DOMElement {
 
 	private function setStructure(ObjReference $reference) {
 		if ($cslref = $reference->getCSL()) {
-			$this->setMixedCitationFromCSL($cslref);
+			$this->setMixedCitationFromCSL($cslref, $reference->getBibliography());
 			$this->setStructureFromCSL($cslref);
 		}
 	}
 
-	private function setMixedCitationFromCSL(\stdClass $csl) {
-		$data = $csl->itemData;
-		$text = null;
-		$contentArr = [];
-
-		// Get the authors
-		$authors = [];
-		foreach ($data->author ?? [] as $reg) {
-			$author = [];
-			if ($family = $reg->family ?? null);
-				$author[] = $family;
-			if ($given = $reg->given ?? null) {
-				// Get only the acronyms
-				$given = preg_replace('/\b(\w)|./', '$1', $given);
-				$given = preg_replace('/(.)/', '$1. ', $given);
-				$given = rtrim($given, ' ');
-				$author[] = $given;
-			}
-			if (! empty($author))
-				$authors[] = implode(', ', $author);
-		}
-		if (! empty($authors)) {
-			$last = count($authors) - 1;
-			$authors[$last] = rtrim($authors[$last], '.');
-			$contentArr[] = implode(', ', $authors);
-		}
-
-		// Get other info
-		$infoArr = [];
-
-		// Container type
-		if ($doctype = $data->{'container-title'} ?? null)
-			$infoArr[] = $doctype;
-		// Get the title
-		if ($title = $data->title ?? null)
-			$contentArr[] = $title;
-		// Get year
-		if ($issued = $data->issued ?? null) {
-			if ($year = $issued->{'date-parts'}[0][0] ?? null)
-				$infoArr[] = $year;
-			elseif ($rawDate = $issued->raw ?? null)
-				if ($date = strtotime($rawDate))
-					if ($year = date('Y', $date))
-						$infoArr[] = $year;
-		}
-		// Get volume
-		if ($volume = $data->volume ?? null)
-			$infoArr[] = "vol. $volume";
-		// Get issue number
-		if ($issue = $data->issue ?? null)
-			$infoArr[] = "nº $issue";
-		// Get issue page
-		if ($page = $data->page ?? null )
-			$infoArr[] = "p. $page";
-		elseif ($page = $data->{'page-first'} ?? null)
-			$infoArr[] = "p. $page";
-
-		if (! empty($infoArr))
-			$contentArr[] = implode(', ', $infoArr);
-
-		if (! empty($contentArr)) {
-			$text = implode('. ', $contentArr).'.';
+	/**
+	 * Appends a mixed-citation.
+	 * @param \stdClass $csl the csl data.
+	 * @param string $bibliography the text to insert.
+	 */
+	private function setMixedCitationFromCSL(\stdClass $csl, ?string $bibliography) {
+		if ($bibliography) {
+			$data = $csl->itemData;
 			$cslPubType = $this->getStdClassPropertyValue($data, 'type');
 			$jatsPubType = self::$refTypeCSLMap[$cslPubType] ?? current(self::$refTypeCSLMap);
-			$mixedCitationEl = $this->createAndAppendElement($this, 'mixed-citation', $text, ['publication-type' => $jatsPubType]);
+			$elementMixedCitationEl = $this->createAndAppendElement($this, 'mixed-citation', $bibliography, ['publication-type' => $jatsPubType]);
 		}
 	}
 

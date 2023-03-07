@@ -17,6 +17,8 @@ use docx2jats\objectModel\body\Image;
 use docx2jats\objectModel\body\Reference;
 use docx2jats\objectModel\Document as ObjectModelDocument;
 use docx2jats\objectModel\traits\Container;
+use Seboettg\CiteProc\StyleSheet;
+use Seboettg\CiteProc\CiteProc;
 use DOMXPath;
 
 class Document {
@@ -104,6 +106,7 @@ class Document {
 	private $cslStyle = null;
 	/** @var ?string */
 	private $cslLocale = null;
+	/** @var \stdClass[] array of csl references used in post-process to set the bibliography depending on style and locale */
 	private $cslReferences;
 
 
@@ -146,6 +149,29 @@ class Document {
 		$this->content = $this->addSectionMarks($content);
 		self::$minimalHeadingLevel = $this->minimalHeadingLevel();
 		$this->setInternalRefs();
+
+		/* Post-process citations with CiteProc to obtain the bibliography based on the style.
+		CiteProc is not ment for this and autosorts the elements.. so we use referenceId to match the reference.
+		// TODO: find a better way to do this */
+		if ($this->getcslStyle()) {
+			try {
+				$style = StyleSheet::loadStyleSheet($this->getcslStyle());
+				$citeProc = new CiteProc($style, $this->getcslLocale(), [
+					'bibliography' => [ 
+						'csl-entry' => function($cslItem, $renderedText) {
+							return sprintf('%06d:%s', $cslItem->referenceId, $renderedText);
+						},
+					]
+				]);
+				$bibliography = $citeProc->render($this->cslReferences, 'bibliography');
+				$bibliography = explode("\n",rtrim(strip_tags(html_entity_decode($bibliography))));
+				sort($bibliography);
+				foreach ($bibliography as $text) {
+					if (preg_match('/0*(\d+):(.+)/', trim($text), $m, PREG_OFFSET_CAPTURE))
+						$this->references[$m[1][0]]->setBibliography($m[2][0]);
+				}
+			} catch (\Throwable $th) {}
+		}
 	}
 
 	/**
@@ -437,6 +463,12 @@ class Document {
 		$this->refCount++;
 		$reference->setId($this->refCount);
 		$this->references[$this->refCount] = $reference;
+		// Used by citeproc to set reference's bibliography in post-process
+		if ($reference->hasStructure()) {
+			$data = $reference->getCSL()->itemData;
+			$data->referenceId = $this->refCount;
+			$this->cslReferences[] = $data;
+		}
 	}
 
 	public function getReferences() : array {
