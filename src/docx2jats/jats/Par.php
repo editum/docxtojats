@@ -79,6 +79,7 @@ class Par extends Element {
 	 * Identifies the type of citation used and creates the reference respecting the rules.
 	 * The ranges will be transformed in lists.
 	 * If the type is uknown it will use by default 1 2 3....
+	 * // TODO: use the style detected: objectModel/Document::getcslStyle
 	 */
 	function createCLSRef(array $refIds, string $plainCit) {
 		// Default fot uknown
