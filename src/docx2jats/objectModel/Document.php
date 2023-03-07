@@ -23,12 +23,15 @@ class Document {
 	use Container;
 
 	const SECT_NESTED_LEVEL_LIMIT = 5; // limit the number of possible levels for sections
+	const CSL_DEFAULT_LOCALE = 'en-EN';
 
 	// Represent styling for OOXMl structure elements
 	const DOCX_STYLES_PARAGRAPH = "paragraph";
 	const DOCX_STYLES_CHARACTER = "character";
 	const DOCX_STYLES_NUMBERING = "numbering";
 	const DOCX_STYLES_TABLE = "table";
+
+	private $ooxmlDocument;
 
 	// Metadata
 	/** @var string */
@@ -96,6 +99,14 @@ class Document {
 	 */
 	public $bookMarks = array();
 
+	// CSL style and locale extracted from custom.xml
+	/** @var ?string */
+	private $cslStyle = null;
+	/** @var ?string */
+	private $cslLocale = null;
+	private $cslReferences;
+
+
 	public function __construct(\DOMDocument $ooxmlDocument, 
 			?\DOMDocument $metadata,
 			?\DOMDocument $partRelationships,
@@ -122,8 +133,10 @@ class Document {
 			self::$numberingXpath = new \DOMXPath($this->numbering);
 
 		$this->docPropsCustom = $docPropsCustom;
-		if ($this->docPropsCustom)
+		if ($this->docPropsCustom) {
 			self::$docPropsCustomXpath = new \DOMXPath($this->docPropsCustom);
+			$this->extractProperties(self::$docPropsCustomXpath);
+		}
 
 		$this->ooxmlDocument = $ooxmlDocument;
 		self::$xpath = new \DOMXPath($this->ooxmlDocument);
@@ -133,6 +146,28 @@ class Document {
 		$this->content = $this->addSectionMarks($content);
 		self::$minimalHeadingLevel = $this->minimalHeadingLevel();
 		$this->setInternalRefs();
+	}
+
+	/**
+	 * Returns the csl style found in custom.xml.
+	 * If the csl locale is nowhere to be found it will fallback to the documents language detected, en-EN otherwise.
+	 * @return string
+	 */
+	public function getcslLocale(): string
+	{
+		if (! $this->cslLocale)
+			if (! $this->cslLocale = $this->getLanguage())
+				$this->cslLocale = self::CSL_DEFAULT_LOCALE;
+		return $this->cslLocale;
+	}
+
+	/**
+	 * Rturns the csl style found in custom.xml.
+	 * @return string|null
+	 */
+	public function getcslStyle(): ?string
+	{
+		return $this->cslStyle;
 	}
 
 	private function getXpath(): DOMXPath
@@ -272,6 +307,39 @@ class Document {
 		$this->subject = $xpath->evaluate('string(/cp:coreProperties/dc:subject)');
 		$this->description = $xpath->evaluate('string(/cp:coreProperties/dc:description)');
 		$this->keywords = $xpath->evaluate('string(/cp:coreProperties/cp:keywords)');
+	}
+
+	/**
+	 * Extract properties from custom.xml like the citation styles and locations for zotero and mendeley.
+	 */
+	private function extractProperties() {
+		// Set a namespace so we can perform queries
+		$ns = $this->docPropsCustom->lookupnamespaceURI(NULL);
+		$xpath = new DOMXPath($this->docPropsCustom);
+		$xpath->registerNamespace('ns', $ns);
+
+		// Try to get mendeley citation style
+		if ($node = $xpath->query('ns:property[@name="Mendeley Citation Style_1"]')->item(0)) {
+			$this->cslStyle = basename($node->nodeValue);
+			// TODO missing locale for mendeley
+		// Try to get zotero citation style, Zotero sets a stringify xml in the properties
+		} else {
+			$nodes = $xpath->query('ns:property[contains(@name, "ZOTERO_PREF")]');
+			$xml = '';
+			foreach ($nodes as $n) {
+				$xml.= $n->textContent;
+			}
+			if ($xml) {
+				$zoteroProperties = new \DOMDocument();
+				if ($zoteroProperties->loadXML($xml, LIBXML_NOWARNING | LIBXML_NOERROR)) {
+					$xpath = new DOMXPath($zoteroProperties);
+					if ($zoteroPropertiesNode = $xpath->query('//data[@zotero-version]')->item(0)) {
+						$this->cslStyle = basename($xpath->evaluate('string(//style[1]/@id)', $zoteroPropertiesNode));
+						$this->cslLocale = $xpath->evaluate('string(//style[1]/@locale)', $zoteroPropertiesNode);
+					}
+				}
+			}
+		}
 	}
 
 	/**
