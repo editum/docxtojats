@@ -465,7 +465,7 @@ class Document {
 		$this->references[$this->refCount] = $reference;
 		// Used by citeproc to set reference's bibliography in post-process
 		if ($reference->hasStructure()) {
-			$data = $reference->getCSL()->itemData;
+			$data = clone $reference->getCSL()->itemData;
 			$data->referenceId = $this->refCount;
 			$this->cslReferences[] = $data;
 		}
