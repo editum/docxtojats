@@ -22,7 +22,7 @@ class Par extends Element {
 	// AMA, VANCUVER: '4-10,5' '(10,16–18,20)'
 	const CLS_AMA_COMPATIBLE = '/^\(?\d+([-\x{2013}\x{2014}]\d+)?(,\d+([-\x{2013}\x{2014}]\d+)?)*\)?$/u';
 	// APA (name1, 2015; name2, 2020; name3, nd)
-	const CLS_APA_COMPATIBLE = '/^\([^\d\W]+.*(; [^\d\W]+.*)*\)$/u';
+	const CLS_APA_COMPATIBLE = '/^\([«]?[^\d\W]+[»]?.*(; [«]?[^\d\W]+[»]?.*)*\)$/u';
 	// IEE: '[4], [7]-[10]'
 	const CLS_IEEE = '/^\[\d+\]([-\x{2013}\x{2014}]\[\d+\])?(, \[\d+\]([-\x{2013}\x{2014}]\[\d+\])?)*$/u';
 
