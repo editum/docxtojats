@@ -19,6 +19,8 @@ class DOCXArchive extends \ZipArchive {
 	public const CONTENT_TYPE_STYLES = 'application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml';
 	public const CONTENT_TYPE_SETTINGS = 'application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml';
 	public const CONTENT_TYPE_NUMBERING = 'application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml';
+	public const CONTENT_TYPE_FOOTNOTES = 'application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml';
+	public const CONTENT_TYPE_ENDNOTES = 'application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml';
 	public const CONTENT_TYPE_CUSTOM_PROP = 'application/vnd.openxmlformats-officedocument.custom-properties+xml';
 	public const CONTENT_TYPE_RELATIONSHIPS = 'application/vnd.openxmlformats-package.relationships+xml';
 
@@ -69,9 +71,17 @@ class DOCXArchive extends \ZipArchive {
 			$numberingPath = $this->getRealFileDocumentPath('word/numbering.xml', self::CONTENT_TYPE_NUMBERING);
 			$numbering = $this->transformToXml($numberingPath);
 
+			// Footnotes
+			$footnotesPath = $this->getRealFileDocumentPath('word/footnotes.xml', self::CONTENT_TYPE_FOOTNOTES);
+			$footnotes = $this->transformToXml($footnotesPath);
+
+			// Endnotes
+			$endnotesPath = $this->getRealFileDocumentPath('word/endnotes.xml', self::CONTENT_TYPE_ENDNOTES);
+			$endnotes = $this->transformToXml($endnotesPath);
+
 			// Custom Document properties, this is used by Mendeley plugin export from LibreOffice Writer
-			$docPropsCustom = $this->getRealFileDocumentPath('docProps/custom.xml', self::CONTENT_TYPE_CUSTOM_PROP);
-			$docPropsCustom = $this->transformToXml($docPropsCustom);
+			$docPropsCustomPath = $this->getRealFileDocumentPath('docProps/custom.xml', self::CONTENT_TYPE_CUSTOM_PROP);
+			$docPropsCustom = $this->transformToXml($docPropsCustomPath);
 			$this->close();
 
 			$this->document = new Document($this->ooxmlDocument,
@@ -79,7 +89,10 @@ class DOCXArchive extends \ZipArchive {
 				$partRelationships,
 				$styles,
 				$numbering,
-				$docPropsCustom);
+				$footnotes,
+				$endnotes,
+				$docPropsCustom
+			);
 		}
 	}
 

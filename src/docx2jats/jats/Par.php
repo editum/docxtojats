@@ -33,7 +33,8 @@ class Par extends Element {
 	public function setContent() {
 		$prevTextRefs = [];
 		foreach ($this->getDataObject()->getContent() as $content) {
-			if (get_class($content) === 'docx2jats\objectModel\body\Field') {
+			$class = get_class($content);
+			if ($class === 'docx2jats\objectModel\body\Field') {
 				// Write links to references from Zotero and Mendeley plugin for MS Word
 				if ($content->getType() === Field::DOCX_FIELD_CSL) {
 					$this->createCLSRef($content->getRefIds(), $content->getPlainCit());
@@ -54,6 +55,14 @@ class Par extends Element {
 					}
 				}
 				$prevTextRefs = []; // restart track of refs from Mendeley LW plugin
+			} elseif ($class === 'docx2jats\objectModel\body\Footnote') {
+				$fn = new Footnote($content);
+				$this->appendChild($fn);
+				$fn->setContent();
+			} elseif ($class === 'docx2jats\objectModel\body\Endnote') {
+				$fn = new Footnote($content);
+				$this->appendChild($fn);
+				$fn->setContent();
 			} else {
 				// Write links to references from Mendeley plugin for LibreOffice Writer
 				/* @var $content \docx2jats\objectModel\body\Text */

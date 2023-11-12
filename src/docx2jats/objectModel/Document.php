@@ -78,6 +78,18 @@ class Document {
 	private $docPropsCustom;
 	static $docPropsCustomXpath;
 
+	/**
+	 * @var DataObject[] contains all footnotes from the document footnotes.xml already parsed
+	 * as they were a w:body each.
+	 */
+	private $footnotesContent;
+
+	/**
+	 * @var DataObject[] contains all footnotes from the document footnotes.xml already parsed
+	 * as they were a w:body each.
+	 */
+	private $endnotesContent;
+
 	private $references = array();
 	private $refCount = 0;
 
@@ -112,7 +124,10 @@ class Document {
 			?\DOMDocument $partRelationships,
 			?\DOMDocument $styles,
 			?\DOMDocument $numbering,
-			?\DOMDocument $docPropsCustom) {
+			?\DOMDocument $footnotes,
+			?\DOMDocument $endnotes,
+			?\DOMDocument $docPropsCustom
+	) {
 
 		$this->metadata = $metadata;
 		if ($this->metadata) {
@@ -141,6 +156,22 @@ class Document {
 		$this->ooxmlDocument = $ooxmlDocument;
 		self::$xpath = new \DOMXPath($this->ooxmlDocument);
 		$this->findBookmarks();
+
+		// Append footnotes to the document with format, as they were another '//w:body' each
+		$this->footnotesContent = [];
+		if ($footnotes) {
+			$footnotesXpath = new \DOMXPath($footnotes);
+			$footnotes = $footnotesXpath->query('//w:footnotes')->item(0);
+			$this->extractNotes($footnotes, 'w:footnote', $this->footnotesContent);
+		}
+
+		// Append endnotes to the document with format, as they were another '//w:body' each
+		$this->endnotesContent = [];
+		if ($endnotes) {
+			$endnotesXpath = new \DOMXPath($endnotes);
+			$endnotes = $endnotesXpath->query('//w:endnotes')->item(0);
+			$this->extractNotes($endnotes, 'w:endnote', $this->endnotesContent);
+		}
 
 		$content = $this->setContent(self::$xpath->query('//w:body')[0]);
 		$this->content = $this->addSectionMarks($content);
@@ -251,6 +282,26 @@ class Document {
 		return $this->content;
 	}
 
+	/**
+	 * Returns the content of a footnote reference.
+	 *
+	 * @return ?\DomElement[]
+	 */
+	public function getFootnoteContent(string $id)
+	{
+		return $this->footnotesContent[$id] ?? null;
+	}
+
+	/**
+	 * Returns the content of a endnote reference.
+	 *
+	 * @return ?\DomElement[]
+	 */
+	public function getEndnoteContent(string $id)
+	{
+		return $this->endnotesContent[$id] ?? null;
+	}
+
 	private function minimalHeadingLevel(): int {
 		$minimalNumber = 7;
 		foreach ($this->content as $dataObject) {
@@ -359,6 +410,30 @@ class Document {
 		}
 		return $dimensions;
 	}
+
+	/**
+	 * Extract notes from another document, (endnotes.xml, footnotes.xml) and append them to the current document, so it can be parsed
+	 * as it was another w:body.
+	 *
+	 * @param ?\DOMElement $notes the (end|foot)notes node
+	 * @param string $querynotes the tag name of the note, ex. w:footnote|w:endnote
+	 * @param array& $content wich will containt the already parsed notes using their id as key
+	 */
+	private function extractNotes(?\DOMElement $notes, string $querynotes, array &$content ): void
+	{
+		if (! $notes)
+			return;
+		// Import notes to the current document
+		if (! $notes = $this->ooxmlDocument->importNode($notes, true))
+			return;
+		$this->ooxmlDocument->appendChild($notes);
+		$kk = self::$xpath->query($querynotes, $notes);
+		foreach (self::$xpath->query($querynotes, $notes) as $note) {
+			$id = $note->getAttribute('w:id');
+			$content[$id] = $this->setContent($note);
+		}
+	}
+
 
 	static function getRelationshipById(string $id): string {
 		$element = self::$relationshipsXpath->query("//*[@Id='" .  $id ."']");

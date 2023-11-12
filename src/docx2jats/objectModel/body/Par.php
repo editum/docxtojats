@@ -74,7 +74,6 @@ class Par extends DataObject {
 		return $this->properties;
 	}
 
-
 	/**
 	 * @return array
 	 */
@@ -113,8 +112,30 @@ class Par extends DataObject {
 					if ($field->getFldCharRefId()) $this->fldCharRefPos[] = count($content)-1;
 					$field = null;
 				} else {
-					$text = new Text($contentNode, $this->getOwnerDocument());
-					$content[] = $text;
+					$footnotes = $this->getXpath()->query('w:footnoteReference', $contentNode);
+					$endnotes = $this->getXpath()->query('w:endnoteReference', $contentNode);
+					// It's a common text node
+					if ($footnotes->length == 0 && $endnotes->length == 0) {
+						$text = new Text($contentNode, $this->getOwnerDocument());
+						$content[] = $text;
+						continue;
+					}
+					// It may have footnotes
+					foreach ($footnotes as $note) {
+						$id = $note->getAttribute('w:id');
+						if ($note = $this->getOwnerDocument()->getFootnoteContent($id)) {
+							$fn = new Footnote($contentNode, $this->getOwnerDocument(), $id, $note);
+							$content[] = $fn;
+						}
+					}
+					// It may have endnotes
+					foreach ($endnotes as $note) {
+						$id = $note->getAttribute('w:id');
+						if ($note = $this->getOwnerDocument()->getEndnoteContent($id)) {
+							$fn = new Endnote($contentNode, $this->getOwnerDocument(), $id, $note);
+							$content[] = $fn;
+						}
+					}
 				}
 			} elseif ($contentNode->nodeName === "w:hyperlink") {
 				$children = $this->getXpath()->query('child::node()', $contentNode);
