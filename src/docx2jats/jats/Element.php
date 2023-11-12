@@ -45,6 +45,11 @@ abstract class Element extends \DOMElement {
 				break;
 			case "docx2jats\objectModel\body\Image":
 				$name = 'fig';
+				break;
+			case "docx2jats\objectModel\body\Endnote":
+			case "docx2jats\objectModel\body\Footnote":
+				$name = 'fn';
+				break;
 		}
 
 		/*
