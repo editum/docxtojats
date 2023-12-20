@@ -170,6 +170,7 @@ class Reference extends \DOMElement {
 		$url = $this->getStdClassPropertyValue($data, 'URL');
 		if ($url) {
 			$urlEl = $this->createAndAppendElement($elementCitationEl, 'ext-link', $url);
+			Text::setExtLink($urlEl, $url);
 		}
 
 		$issn = $this->getStdClassPropertyValue($data, 'ISSN');
