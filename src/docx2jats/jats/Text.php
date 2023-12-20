@@ -14,6 +14,43 @@ use docx2jats\objectModel\body\Text as ObjectText;
 
 class Text {
 
+	public static function setExtLink(\DOMElement &$el, string $link)
+	{
+		// email
+		if (preg_match('/^mailto:[-\.\w]+@([\w-]+\.)+[\w-]{2,4}$/', $link))
+			$type = 'email';
+		// ec       Enzyme nomenclature. See http://www.chem.qmw.ac.uk/iubmb/enzyme/
+		// gen      GenBank identifier
+		elseif (preg_match('/^https?:\/\/www.ncbi.nlm.nih.gov\/genbank\/.+/', $link))
+			$type = 'genbank';
+		// genpept  Translated protein-encoding sequence database
+		// highwire HighWire Press intrajournal
+		// pdb      Protein data bank. See http://www.rcsb.org/pdb/
+		// pgr      Plant gene register. See http://www.ebi.ac.uk/~textman/pgr-htdocs/pgr/
+		// pir      Protein Information Resource. See http://pir.georgetown.edu
+		// pirdb    Protein Information Resource. See http://pir.georgetown.edu
+		// pmcid    PubMed Central identifier
+		elseif (preg_match('/^https?:\/\/www.ncbi.nlm.nih.gov\/pmc\/.*PMC\d{7,9}\/?$/', $link))
+			$type = 'pmcid';
+		// pmid     PubMed identifier
+		elseif (preg_match('/^https?:\/\/www.ncbi.nlm.nih.gov\/pubmed\/.*\d{7,9}\/?$/', $link))
+			$type = 'pmid';
+		// sprot    Swiss-Prot. See http://www.ebi.ac.uk/swissprot/
+		// aoi      Astronomical Object Identifier
+		// doi      Digital Object Identifier
+		elseif (preg_match('/^(https?:\/\/.*\.doi\.org\/)?10\.\d{4,9}\/[a-zA-Z0-9-. ;\/():]+$/', $link))
+			$type = 'doi';
+		// ftp      File transfer protocol
+		elseif (preg_match('/^s?ftp:\/\/.+$/', $link))
+			$type = 'ftp';
+		// uri      Website or web service
+		else
+			$type = 'uri';
+
+		$el->setAttribute("xlink:href", $link);
+		$el->setAttribute('ext-link-type', $type);
+	}
+
 	public static function extractText(ObjectText $jatsText, \DOMElement $domElement) : void {
 
 		// Get DOMDocument
@@ -56,7 +93,7 @@ class Text {
 					$nodeElement->nodeValue = htmlspecialchars($jatsText->getContent());
 					$domElement->appendChild($nodeElement);
 					if ($type == "ext-link") {
-						$nodeElement->setAttribute("xlink:href", $jatsText->getLink());
+						self::setExtLink($nodeElement, $jatsText->getLink());
 					}
 				} else {
 					foreach ($type as $insideKey => $insideType) {
@@ -83,7 +120,7 @@ class Text {
 
 					$nodeElement->nodeValue = htmlspecialchars($jatsText->getContent());
 					if ($type == "ext-link"){
-						$nodeElement->setAttribute("xlink:href", $jatsText->getLink());
+						self::setExtLink($nodeElement, $jatsText->getLink());
 					}
 
 					foreach ($prevElements as $prevKey => $prevElement) {
