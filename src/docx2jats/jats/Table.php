@@ -63,10 +63,15 @@ class Table extends Element {
 		$tbodyNode = $this->ownerDocument->createElement('tbody');
 		$tableNode->appendChild($tbodyNode);
 
+		// Set an id for the row to be used by the cell container as a prefix for the elements created there
+		// After all rows have been set, the id can be removed
+		$i = 1;
 		foreach ($dataObject->getContent() as $content) {
 			$row = new JatsRow($content);
 			$tbodyNode->appendChild($row);
+			$row->setAttribute('id', $this->getAttribute('id').'-r'.$i++);
 			$row->setContent();
+			$row->removeAttribute('id');
 		}
 	}
 }

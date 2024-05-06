@@ -18,10 +18,15 @@ class Row extends Element {
 	}
 
 	public function setContent() {
+		// Set an id for the cell container to be used as prefix for the elements created there
+		// After all cells have been set, the id can be removed
+		$i = 1;
 		foreach ($this->getDataObject()->getContent() as $content) {
 			$cell = new JatsCell($content);
 			$this->appendChild($cell);
+			$cell->setAttribute('id', $this->getAttribute('id').'c'.$i++);
 			$cell->setContent();
+			$cell->removeAttribute('id');
 		}
 	}
 }
