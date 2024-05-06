@@ -32,7 +32,8 @@ class Cell extends Element {
 			$this->setAttribute('rowspan', $rowspan);
 
 		// $this->tr->tbody->table->tablewrap->getAttribute('id')
-		@$tid = $this->parentNode->parentNode->parentNode->parentNode->getAttribute('id');
+		//@$tid = $this->parentNode->parentNode->parentNode->parentNode->getAttribute('id');
+		$tid = $this->getAttribute('id');
 		foreach ($dataObject->getContent() as $content) {
 			$this->appendContent($content, $this, $tid);
 		}
