@@ -30,6 +30,7 @@ abstract class InfoBlock extends DataObject
     {
         $label = '';
         $title = '';
+        $parts = [];
 
         // Check if caption has references and parse them
         $this->parseReferences($el);
@@ -37,33 +38,28 @@ abstract class InfoBlock extends DataObject
         // Identifying and parsing block element's label and title
         $runs = Document::$xpath->query('./w:r', $el);
         foreach ($runs as $key => $run) {
-			$textNodes = Document::$xpath->query('./w:t', $run);
-			if (!count($textNodes)) continue;
+            $textNodes = Document::$xpath->query('./w:t', $run);
+            if (!count($textNodes)) continue;
 
-			// Just assuming that the first text run is a label, default for MS Word and Libreoffice Writer
-            if ($key == 0) {
-                $label .= $textNodes[0]->nodeValue;
-            }
+            // Detect if the text run contains a bookmark
+            $refCount = count($this->refIds);
+            $this->setBookmarks($run);
+            if (count($this->refIds) > $refCount) continue; // Don't parse text if a text run
 
-			// This detects if text run contains a bookmark
-			$refCount = count($this->refIds);
-	        $this->setBookmarks($run);
-			if (count($this->refIds) > $refCount) continue; // Don't parse text if a text run
-
-	        $title .= $textNodes[0]->nodeValue;
+            $parts[] = $textNodes[0]->nodeValue;
         }
 
-        $labelNumber = Document::$xpath->query('./w:fldSimple//w:t', $el)[0];
-        if (!is_null($labelNumber)) {
-            $label .= $labelNumber->nodeValue;
+        // Extract label and title
+        if (!empty($parts)) {
+            $labelNumber = Document::$xpath->query('./w:fldSimple//w:t', $el)[0];
+            $label = array_shift($parts);
+            $label .= is_null($labelNumber) && count($parts) > 1 ? array_shift($parts) : $labelNumber->nodeValue;
+            $this->label = rtrim($label, "\n\r\t\v\0:- ");
         }
-
-        if (!empty($label)) {
-            $this->label = $label;
-        }
-
-        if (!empty($title)) {
-            $this->title = trim($title);
+        // TODO extract title and description, if there is more than one part for the title
+        if (!empty($parts)) {
+            $title = implode(' ', $parts);
+            $this->title = trim($title, "\n\r\t\v\0:- ");
         }
 
         // Caption may have bookmarks that are pointed from outside the table, retrieve their IDs;
