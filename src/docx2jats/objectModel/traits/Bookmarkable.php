@@ -50,6 +50,7 @@ trait Bookmarkable
 		$this->bookmarked = true;
 		$allBookmarks = $this->getOwnerDocument()->bookMarks;
 		foreach ($bookMarksActive as $bookMarkActive) {
+			if (! isset($allBookmarks[$bookMarkActive])) continue;
 			$name = $allBookmarks[$bookMarkActive];
 			$this->bookmarkData[$bookMarkActive]['name'] = $name ;
 			$content = $this->searchBookmarkContentByName($name);
