@@ -26,10 +26,17 @@ class Document {
 	const CSL_DEFAULT_LOCALE = 'en-EN';
 
 	// Represent styling for OOXMl structure elements
-	const DOCX_STYLES_PARAGRAPH = "paragraph";
+	const DOCX_STYLES_PARAGRAPH	= "paragraph";
 	const DOCX_STYLES_CHARACTER = "character";
 	const DOCX_STYLES_NUMBERING = "numbering";
 	const DOCX_STYLES_TABLE = "table";
+
+	const K_DOCUMENT_RELATIONSHIPS = 'document';
+	const K_ENDNOTES_RELATIONSHIPS = 'endnotes';
+	const K_FOOTNOTES_RELATIONSHIPS = 'footnotes';
+	const VALID_RELATIONSHIPS = [
+		self::K_DOCUMENT_RELATIONSHIPS, self::K_ENDNOTES_RELATIONSHIPS, self::K_FOOTNOTES_RELATIONSHIPS
+	];
 
 	private $ooxmlDocument;
 
@@ -55,12 +62,18 @@ class Document {
 	private $content;
 	private static $minimalHeadingLevel;
 
+	// REVIEW most if not all of these static variables should be private members
+
 	/** @var \DOMDocument document metadata like tittle, language, etc */
 	private $metadata;
 	static $metadataXpath;
 
-	/* @var $relationships \DOMDocument contains relationships between document elements, e.g. the link and its target */
-	private $relationships;
+	/** @var ?\DOMDocument[] with all relationships between document elements like: document, endnotes, footnotes... It may content links and their targets */
+	private $relationshipsDomList;
+	/** @var ?\DOMXPath[] xpath for al document relationships: document, endnotes, footnotes */
+	private $relationshipsXpathList;
+
+	/* @var $relationshipsXpath \DOMXPath with the current relationships being used. At some point it may be document, endnotes... */
 	static $relationshipsXpath;
 
 	/* @var $styles \DOMDocument represents document styles, e.g., paragraphs or lists styling */
@@ -121,12 +134,12 @@ class Document {
 
 	public function __construct(\DOMDocument $ooxmlDocument, 
 			?\DOMDocument $metadata,
-			?\DOMDocument $partRelationships,
 			?\DOMDocument $styles,
 			?\DOMDocument $numbering,
 			?\DOMDocument $footnotes,
 			?\DOMDocument $endnotes,
-			?\DOMDocument $docPropsCustom
+			?\DOMDocument $docPropsCustom,
+			array $relationships
 	) {
 
 		$this->metadata = $metadata;
@@ -135,9 +148,13 @@ class Document {
 			$this->extractMetadata();
 		}
 
-		$this->relationships = $partRelationships;
-		if ($this->relationships)
-			self::$relationshipsXpath = new \DOMXPath($this->relationships);
+		// Prepare all document parts relationships like links...
+		foreach (self::VALID_RELATIONSHIPS as $name) {
+			$relationship = $relationships[$name] ?? null;
+			$this->relationshipsDomList[$name] = $relationship;
+			$this->relationshipsXpathList[$name] = $relationship ? new \DOMXPath($relationship) : null;
+		}
+		self::$relationshipsXpath = &$this->relationshipsXpathList[self::K_DOCUMENT_RELATIONSHIPS];
 
 		$this->styles = $styles;
 		if ($this->styles)
@@ -160,6 +177,7 @@ class Document {
 		// Append footnotes to the document with format, as they were another '//w:body' each
 		$this->footnotesContent = [];
 		if ($footnotes) {
+			self::$relationshipsXpath = &$this->relationshipsXpathList[self::K_FOOTNOTES_RELATIONSHIPS];
 			$footnotesXpath = new \DOMXPath($footnotes);
 			$footnotes = $footnotesXpath->query('//w:footnotes')->item(0);
 			$this->extractNotes($footnotes, 'w:footnote', $this->footnotesContent);
@@ -168,11 +186,15 @@ class Document {
 		// Append endnotes to the document with format, as they were another '//w:body' each
 		$this->endnotesContent = [];
 		if ($endnotes) {
+			self::$relationshipsXpath = &$this->relationshipsXpathList[self::K_ENDNOTES_RELATIONSHIPS];
 			$endnotesXpath = new \DOMXPath($endnotes);
 			$endnotes = $endnotesXpath->query('//w:endnotes')->item(0);
 			$this->extractNotes($endnotes, 'w:endnote', $this->endnotesContent);
 		}
 
+		// REVIEW the existance of this relation is not being checked in getRelationshipById
+		// REVIEW this should not be an static variable...
+		self::$relationshipsXpath = &$this->relationshipsXpathList[self::K_DOCUMENT_RELATIONSHIPS];
 		$content = $this->setContent(self::$xpath->query('//w:body')[0]);
 		$this->content = $this->addSectionMarks($content);
 		self::$minimalHeadingLevel = $this->minimalHeadingLevel();
@@ -427,14 +449,15 @@ class Document {
 		if (! $notes = $this->ooxmlDocument->importNode($notes, true))
 			return;
 		$this->ooxmlDocument->appendChild($notes);
-		$kk = self::$xpath->query($querynotes, $notes);
-		foreach (self::$xpath->query($querynotes, $notes) as $note) {
+		$notes = self::$xpath->query($querynotes, $notes);
+		foreach ($notes as $note) {
 			$id = $note->getAttribute('w:id');
 			$content[$id] = $this->setContent($note);
 		}
 	}
 
 
+	// REVIEW ¿should return null if the relationship doesn't exist?
 	static function getRelationshipById(string $id): string {
 		$element = self::$relationshipsXpath->query("//*[@Id='" .  $id ."']");
 		$target = $element[0]->getAttribute("Target");

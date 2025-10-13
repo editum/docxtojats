@@ -57,8 +57,8 @@ class DOCXArchive extends \ZipArchive {
 			$this->ooxmlDocument = $this->transformToXml($ooxmlDocumentPath);
 
 			// Relationships of the Main Document Part
-			$partRelationshipsPath = $this->getRealFileDocumentPath('word/_rels/document.xml.rels', self::CONTENT_TYPE_RELATIONSHIPS, $ooxmlDocumentPath);
-			$partRelationships = $this->transformToXml($partRelationshipsPath);
+			$documentRelationshipsPath = $this->getRealFileDocumentPath('word/_rels/document.xml.rels', self::CONTENT_TYPE_RELATIONSHIPS, $ooxmlDocumentPath);
+			$documentRelationships = $this->transformToXml($documentRelationshipsPath);
 
 			// Style names used in the document, styles should be checked recursively, see docx2jats\objectModel\Document::getBuiltinStyle
 			$stylePath = $this->getRealFileDocumentPath('word/styles.xml', self::CONTENT_TYPE_STYLES);
@@ -71,13 +71,21 @@ class DOCXArchive extends \ZipArchive {
 			$numberingPath = $this->getRealFileDocumentPath('word/numbering.xml', self::CONTENT_TYPE_NUMBERING);
 			$numbering = $this->transformToXml($numberingPath);
 
+			// Endnotes
+			$endnotesPath = $this->getRealFileDocumentPath('word/endnotes.xml', self::CONTENT_TYPE_ENDNOTES);
+			$endnotes = $this->transformToXml($endnotesPath);
+
+			// Relationships of the endnotes part
+			$endnotesRelationshipsPath = $this->getRealFileDocumentPath('word/_rels/endnotes.xml.rels', self::CONTENT_TYPE_RELATIONSHIPS, $endnotesPath);
+			$endnotesRelationships = $this->transformToXml($endnotesRelationshipsPath);
+
 			// Footnotes
 			$footnotesPath = $this->getRealFileDocumentPath('word/footnotes.xml', self::CONTENT_TYPE_FOOTNOTES);
 			$footnotes = $this->transformToXml($footnotesPath);
 
-			// Endnotes
-			$endnotesPath = $this->getRealFileDocumentPath('word/endnotes.xml', self::CONTENT_TYPE_ENDNOTES);
-			$endnotes = $this->transformToXml($endnotesPath);
+			// Relationships of the footnotes part
+			$footnotesRelationshipsPath = $this->getRealFileDocumentPath('word/_rels/footnotes.xml.rels', self::CONTENT_TYPE_RELATIONSHIPS, $footnotesPath);
+			$footnotesRelationships = $this->transformToXml($footnotesRelationshipsPath);
 
 			// Custom Document properties, this is used by Mendeley plugin export from LibreOffice Writer
 			$docPropsCustomPath = $this->getRealFileDocumentPath('docProps/custom.xml', self::CONTENT_TYPE_CUSTOM_PROP);
@@ -86,12 +94,16 @@ class DOCXArchive extends \ZipArchive {
 
 			$this->document = new Document($this->ooxmlDocument,
 				$metadata,
-				$partRelationships,
 				$styles,
 				$numbering,
 				$footnotes,
 				$endnotes,
-				$docPropsCustom
+				$docPropsCustom,
+				[
+					Document::K_DOCUMENT_RELATIONSHIPS => $documentRelationships,
+					Document::K_ENDNOTES_RELATIONSHIPS => $endnotesRelationships,
+					Document::K_FOOTNOTES_RELATIONSHIPS => $footnotesRelationships,
+				]
 			);
 		}
 	}
@@ -192,12 +204,20 @@ class DOCXArchive extends \ZipArchive {
 						$path = $override->getAttribute('PartName');
 						break;
 					} else {
-						// Find the file associated with relationships, compare by filename
-						$partName = $override->getAttribute('PartName');
-						if (strpos(pathinfo($partName)['basename'], pathinfo($parentPath)['basename']) !== false) {
+						// Find the file associated with relationships
+						// RELATIONSHIPS: buscar el archivo asociado al parent usando regex exacto
+						$partName   = $override->getAttribute('PartName');
+						$parentBase = pathinfo($parentPath, PATHINFO_FILENAME);
+
+						if (preg_match('/' . preg_quote($parentBase, '/') . '\.rels$/', $partName)) {
 							$path = $partName;
 							break;
 						}
+						//$partName = $override->getAttribute('PartName');
+						//if (strpos(pathinfo($partName)['basename'], pathinfo($parentPath)['basename']) !== false) {
+						//	$path = $partName;
+						//	break;
+						//}
 					}
 				}
 			}
