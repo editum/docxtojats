@@ -32,13 +32,19 @@ class Table extends Element {
 		}
 
 		if ($dataObject->getLabel()) {
-			$this->appendChild($this->ownerDocument->createElement('label', $dataObject->getLabel()));
+			$labelNode = $this->ownerDocument->createElement('label');
+			$labelTextNode = $this->ownerDocument->createTextNode($dataObject->getLabel());
+			$labelNode->appendChild($labelTextNode);
+			$this->appendChild($labelNode);
 		}
 
 		if ($dataObject->getTitle()) {
 			$captionNode = $this->ownerDocument->createElement('caption');
 			$this->appendChild($captionNode);
-			$title = $this->ownerDocument->createElement('title', $dataObject->getTitle());
+			$titleNode = $this->ownerDocument->createElement('title');
+			$captionNode->appendChild($titleNode);
+			$titleTextNode = $this->ownerDocument->createTextNode($dataObject->getTitle());
+			$titleNode->appendChild($titleTextNode);
 			// append citation if exists
 			if ($dataObject->hasReferences()) {
 				$refIds = $dataObject->getRefIds();
@@ -49,13 +55,13 @@ class Table extends Element {
 					$refEl->setAttribute('rid', Reference::JATS_REF_ID_PREFIX . $id);
 					if ($key !== $lastKey) {
 						$empty = $this->ownerDocument->createTextNode(' ');
-						$title->appendChild($empty);
+						$titleNode->appendChild($empty);
 					}
-					$title->appendChild($refEl);
-	            }
-	        }
+					$titleNode->appendChild($refEl);
+				}
+			}
 
-			$captionNode->appendChild($title);
+			$captionNode->appendChild($titleNode);
 		}
 
 		$tableNode = $this->ownerDocument->createElement('table');
