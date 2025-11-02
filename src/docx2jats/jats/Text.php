@@ -1,4 +1,6 @@
-<?php namespace docx2jats\jats;
+<?php
+
+namespace docx2jats\jats;
 
 /**
  * @file src/docx2jats/jats/Text.php
@@ -12,47 +14,72 @@
 use docx2jats\objectModel\DataObject;
 use docx2jats\objectModel\body\Text as ObjectText;
 
-class Text {
-
-	public static function setExtLink(\DOMElement &$el, string $link)
+class Text
+{
+	public static function createExtLink(\DOMDocument $doc, string $href, ?string $text = null): \DOMElement
 	{
-		// email
-		if (preg_match('/^mailto:[-\.\w]+@([\w-]+\.)+[\w-]{2,4}$/', $link))
-			$type = 'email';
-		// ec       Enzyme nomenclature. See http://www.chem.qmw.ac.uk/iubmb/enzyme/
-		// gen      GenBank identifier
-		elseif (preg_match('/^https?:\/\/www.ncbi.nlm.nih.gov\/genbank\/.+/', $link))
-			$type = 'genbank';
-		// genpept  Translated protein-encoding sequence database
-		// highwire HighWire Press intrajournal
-		// pdb      Protein data bank. See http://www.rcsb.org/pdb/
-		// pgr      Plant gene register. See http://www.ebi.ac.uk/~textman/pgr-htdocs/pgr/
-		// pir      Protein Information Resource. See http://pir.georgetown.edu
-		// pirdb    Protein Information Resource. See http://pir.georgetown.edu
-		// pmcid    PubMed Central identifier
-		elseif (preg_match('/^https?:\/\/www.ncbi.nlm.nih.gov\/pmc\/.*PMC\d{7,9}\/?$/', $link))
-			$type = 'pmcid';
-		// pmid     PubMed identifier
-		elseif (preg_match('/^https?:\/\/www.ncbi.nlm.nih.gov\/pubmed\/.*\d{7,9}\/?$/', $link))
-			$type = 'pmid';
-		// sprot    Swiss-Prot. See http://www.ebi.ac.uk/swissprot/
-		// aoi      Astronomical Object Identifier
-		// doi      Digital Object Identifier
-		elseif (preg_match('/^(https?:\/\/.*\.doi\.org\/)?10\.\d{4,9}\/[a-zA-Z0-9-. ;\/():]+$/', $link))
-			$type = 'doi';
-		// ftp      File transfer protocol
-		elseif (preg_match('/^s?ftp:\/\/.+$/', $link))
-			$type = 'ftp';
-		// uri      Website or web service
-		else
-			$type = 'uri';
+		$linkType = 'uri'; // default
 
-		$el->setAttribute("xlink:href", $link);
-		$el->setAttribute('ext-link-type', $type);
+		// Use de href as text
+		if ($text) {
+			$text = $href;
+		}
+
+		// DOI detection
+		if (preg_match('/^(https?:\/\/(?:dx\.)?doi\.org\/)?(10\.\d{4,9}\/\S+)$/i', $href, $m)) {
+			$linkType = 'doi';
+			$doi = $m[2];
+			$href = $m[1] ? $m[0] : 'https://doi.org/' . $doi;
+			$text = $doi;
+		}
+		// PMC detection
+		elseif (preg_match('/https?:\/\/www\.ncbi\.nlm\.nih\.gov\/pmc\/articles\/PMC(\d{7,9})\/?/i', $href, $m)) {
+			$linkType = 'pmc';
+			$text = 'PMC' . $m[1];
+		}
+		// PMID detection
+		elseif (preg_match('/(https?:\/\/pubmed\.ncbi\.nlm\.nih.gov\/)?(\d{5,9})\/?/i', $href, $m)) {
+			$linkType = 'pmid';
+			$pmid = $m[2];
+			$href = $m[1] ? $m[0] : 'https://pubmed.ncbi.nlm.nih.gov/' . $pmid;
+			$text = $pmid;
+		}
+		// GenBank detection
+		elseif (preg_match('/https?:\/\/(?:www\.)?ncbi\.nlm\.nih\.gov\/nuccore\/([A-Z0-9_.-]+)/i', $href, $m)) {
+			$linkType = 'genbank';
+			$text = $m[1];
+		}
+		// Clinical trial detection
+		elseif (preg_match('/^(?:https?:\/\/(?:www\.)?clinicaltrials\.gov\/(?:ct2\/)?show\/)?(NCT\d{8,9})$/i', $href, $m)) {
+			$linkType = 'clinical-trial';
+			$trialId = $m[1];
+			$href = 'https://clinicaltrials.gov/show/' . $trialId;
+			$text = $trialId;
+		}
+		// E-mail detection
+		elseif (preg_match('/^mailto:([^@]+@[^@]+\.[^@]+)$/i', $href, $m) || filter_var($href, FILTER_VALIDATE_EMAIL)) {
+			$linkType = 'email';
+			$email = $m[1] ?? $href;
+			$href = (stripos($href, 'mailto:') === 0) ? $href : 'mailto:' . $email;
+			$text = $email;
+		}
+		// FTP detection
+		elseif (preg_match('/^ftp:\/\/\S+/i', $href)) {
+			$linkType = 'ftp';
+			// keep text as-is unless redundant
+			$text = ($text === $href) ? basename($href) : $text;
+		}
+
+		$extLink = $doc->createElement('ext-link');
+		$extLink->setAttribute('ext-link-type', $linkType);
+		$extLink->setAttribute('xlink:href', $href);
+		$extLink->appendChild($doc->createTextNode($text));
+
+		return $extLink;
 	}
 
-	public static function extractText(ObjectText $jatsText, \DOMElement $domElement) : void {
-
+	public static function extractText(ObjectText $jatsText, \DOMElement $domElement): void
+	{
 		// Get DOMDocument
 		$domDocument = $domElement->ownerDocument;
 		// Dealing with simple text (without any properties)
@@ -88,13 +115,13 @@ class Text {
 		// Dealing with text that has only one property, e.g. italic, bold, link
 		if (count($typeArray) === 1) {
 			foreach ($typeArray as $typeKey => $type) {
-				if (!is_array($type)) {
+				if ($type === 'ext-link') {
+					$nodeElement = self::createExtLink($domDocument, $jatsText->getLink(), $jatsText->getContent());
+					$domElement->appendChild($nodeElement);
+				} elseif (!is_array($type)) {
 					$nodeElement = $domDocument->createElement($type);
 					$nodeElement->nodeValue = htmlspecialchars($jatsText->getContent());
 					$domElement->appendChild($nodeElement);
-					if ($type == "ext-link") {
-						self::setExtLink($nodeElement, $jatsText->getLink());
-					}
 				} else {
 					foreach ($type as $insideKey => $insideType) {
 						$nodeElement = $domDocument->createElement($insideKey);
@@ -108,7 +135,10 @@ class Text {
 			/* @var $prevElement array of DOMElements */
 			$prevElements = array();
 			foreach ($typeArray as $key => $type) {
-				if (!is_array($type)) {
+				if ($type === 'ext-link') {
+					$nodeElement = self::createExtLink($domDocument, $jatsText->getLink(), $jatsText->getContent());
+				}
+				elseif (!is_array($type)) {
 					$nodeElement = $domDocument->createElement($type);
 				}
 
@@ -118,13 +148,12 @@ class Text {
 					$domElement->appendChild($prevElements[0]);
 				} elseif (($key === (count($typeArray) - 1))) {
 
-					$nodeElement->nodeValue = htmlspecialchars($jatsText->getContent());
-					if ($type == "ext-link"){
-						self::setExtLink($nodeElement, $jatsText->getLink());
+					if ($type !== 'ext-link') {
+						$nodeElement->nodeValue = htmlspecialchars($jatsText->getContent());
 					}
 
 					foreach ($prevElements as $prevKey => $prevElement) {
-						if ($prevKey !== (count($prevElements) -1)) {
+						if ($prevKey !== (count($prevElements) - 1)) {
 							$prevElement->appendChild(next($prevElements));
 						}
 					}

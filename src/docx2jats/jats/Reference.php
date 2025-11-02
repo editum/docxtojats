@@ -1,7 +1,7 @@
 <?php namespace docx2jats\jats;
 
 /**
- * @file src/docx2jats/jats/Row.php
+ * @file src/docx2jats/jats/Reference.php
  *
  * Copyright (c) 2018-2019 Vitalii Bezsheiko
  * Distributed under the GNU GPL v3.
@@ -155,8 +155,8 @@ class Reference extends \DOMElement {
 
 		$url = $this->getStdClassPropertyValue($data, 'URL');
 		if ($url) {
-			$urlEl = $this->createAndAppendElement($elementCitationEl, 'ext-link', $url);
-			Text::setExtLink($urlEl, $url);
+			$urlEl = Text::createExtLink($elementCitationEl->ownerDocument, $url);
+			$elementCitationEl->appendChild($urlEl);
 		}
 
 		$issn = $this->getStdClassPropertyValue($data, 'ISSN');
