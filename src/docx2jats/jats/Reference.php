@@ -125,7 +125,7 @@ class Reference extends \DOMElement {
 		if ($bibliography) {
 			$data = $csl->itemData;
 			$cslPubType = $this->getStdClassPropertyValue($data, 'type');
-			$jatsPubType = self::$refTypeCSLMap[$cslPubType] ?? current(self::$refTypeCSLMap);
+			$jatsPubType = $this->normalizePublicationType($cslPubType);
 			$elementMixedCitationEl = $this->createAndAppendElement($this, 'mixed-citation', $bibliography, ['publication-type' => $jatsPubType]);
 		}
 	}
