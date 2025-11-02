@@ -15,22 +15,81 @@ class Reference extends \DOMElement {
 
 	public const JATS_REF_ID_PREFIX = 'bib';
 
-	/** @var $refTypeCSLMap string[]  compatible with Texture */
-	public static $refTypeCSLMap = [
-		'article-journal' => 'journal',
-		'book' => 'book',
-		'chapter' => 'chapter',
-		'paper-conference' => 'confproc',
-		'dataset' => 'data',
-		'article-magazine' => 'periodical',
-		'article-newspaper' => 'periodical',
-		'manuscript' => 'preprint',
-		'report' => 'report',
-		'patent' => 'patent',
-		'webpage' => 'website',
-		'post-weblog' => 'website',
-		'post' => 'website',
-		'thesis' => 'thesis',
+	// https://scielo.readthedocs.io/projects/scielo-publishing-schema/pt-br/latest/tagset/elemento-element-citation.html?highlight=element%20citation
+	/** @var array Conversion map CSL/AnyStyle -> SPS 1.9 */
+	const CSL_TO_PUBLICATION_TYPE_MAP = [
+		// Articles in journals and newspapers
+		'article-journal'   => 'journal',
+		'article-magazine'  => 'journal',
+		'article-newspaper' => 'newspaper',
+		'article'           => 'journal',
+
+		// Books and book chapters
+		'book'              => 'book',
+		'chapter'           => 'book',
+		'book-section'      => 'book',
+
+		// Conference/proceedings
+		'paper-conference'  => 'confproc',
+		'proceedings'       => 'confproc',
+
+		// Theses and dissertations
+		'thesis'            => 'thesis',
+		'dissertation'      => 'thesis',
+		'monograph'         => 'thesis',
+
+		// Technical and institutional reports
+		'report'            => 'report',
+		'technical-report'  => 'report',
+
+		// Research data/databases
+		'dataset'           => 'data',
+		'database'          => 'database',
+
+		// Websites and blogs
+		'webpage'           => 'webpage',
+		'blog-post'         => 'webpage',
+		'post'              => 'webpage',
+		'post-weblog'       => 'webpage',
+		'website'           => 'webpage',
+
+		// Software
+		'software'           => 'software',
+		'code'               => 'software',
+
+		// Patentes
+		'patent'             => 'patent',
+
+		// Legal/regulatory documents
+		'legal_case'         => 'legal-doc',
+		'legal_document'     => 'legal-doc',
+		'statute'            => 'legal-doc',
+
+		// Other/fallback
+		'manuscript'         => 'other',
+		'encyclopedia'       => 'other',
+		'map'                => 'other',
+		'motion_picture'     => 'other',
+		'interview'          => 'other',
+		'podcast'            => 'other',
+		'broadcast'          => 'other',
+	];
+
+	/** @var array Publication titles by type */
+	const PUBLICATION_TITLE_TAG_MAP = [
+		'book'      => 'source',           // For full books; use 'chapter-title' if it's a book chapter
+		'confproc'  => 'source',           // Name of the conference or proceedings
+		'database'  => 'source',           // Name of the database
+		'journal'   => 'article-title',    // Article title; <source> optional for journal
+		'patent'    => 'article-title',    // Patent title
+		'report'    => 'article-title',    // Technical report title
+		'software'  => 'article-title',    // Software name; <source> optional if applicable
+		'thesis'    => 'article-title',    // Thesis or dissertation title
+		'webpage'   => 'article-title',    // Web page title; <source> optional
+		'legal-doc' => 'article-title',    // Law or legal document title
+		'newspaper' => 'article-title',    // Newspaper article title; <source> for the newspaper
+		'data'      => 'article-title',    // Dataset name
+		'other'     => 'article-title',    // Generic fallback
 	];
 
 	public function __construct() {
@@ -60,11 +119,8 @@ class Reference extends \DOMElement {
 	private function setStructureFromCSL(\stdClass $csl) {
 		$data = $csl->{'itemData'};
 		$cslPubType = $this->getStdClassPropertyValue($data, 'type');
-		if (array_key_exists($cslPubType, self::$refTypeCSLMap)) {
-			$jatsPubType = self::$refTypeCSLMap[$cslPubType];
-		} else {
-			$jatsPubType = current(self::$refTypeCSLMap);
-		}
+		$jatsPubType = $this->normalizePublicationType($cslPubType);
+
 		$elementCitationEl = $this->createAndAppendElement($this, 'element-citation', null, ['publication-type' => $jatsPubType]);
 
 		// Authors and editors
@@ -86,13 +142,8 @@ class Reference extends \DOMElement {
 		// Title
 		$title = $this->getStdClassPropertyValue($data, 'title');
 		if ($title) {
-			if ($jatsPubType === 'chapter')  {
-				$this->createAndAppendElement($elementCitationEl, 'chapter-title', $title);
-			} elseif ($jatsPubType === 'book') {
-				$this->createAndAppendElement($elementCitationEl, 'source', $title);
-			} else {
-				$this->createAndAppendElement($elementCitationEl, 'article-title', $title);
-			}
+			$titleTag = $this->normalizePublictationTitleTag($jatsPubType);
+			$titleEl = $this->createAndAppendElement($elementCitationEl, $titleTag, $title);
 		}
 
 		// Source
@@ -199,8 +250,6 @@ class Reference extends \DOMElement {
 				}
 			}
 		}
-
-
 	}
 
 	private function createAndAppendElement(\DOMElement $parentEl, string $elName, string $text = null, array $attrNameValue = null) : \DOMElement {
@@ -250,5 +299,27 @@ class Reference extends \DOMElement {
 				$givenEl = $this->createAndAppendElement($nameEl, 'given-names', $given);
 			}
 		}
+	}
+
+	/**
+	 * Normalizes de publication type.
+	 *
+	 * @param ?string $cslPubType the csl publication title
+	 * @return string the corresponding value or other for fallback
+	 */
+	private function normalizePublicationType(?string $cslPubType): string
+	{
+		return !$cslPubType || !self::CSL_TO_PUBLICATION_TYPE_MAP[$cslPubType] ? 'other' : static::CSL_TO_PUBLICATION_TYPE_MAP[$cslPubType];
+	}
+
+	/**
+	 * Normalizes de publication title tag-name.
+	 *
+	 * @param ?string the publication type.
+	 * @return string the prefered tag name for the title.
+	 */
+	protected function normalizePublictationTitleTag(?string $publicationType): string
+	{
+		return !$publicationType || !static::PUBLICATION_TITLE_TAG_MAP ? 'article-title' : static::PUBLICATION_TITLE_TAG_MAP[$publicationType];
 	}
 }
