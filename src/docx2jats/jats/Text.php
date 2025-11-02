@@ -70,6 +70,11 @@ class Text
 			$text = ($text === $href) ? basename($href) : $text;
 		}
 
+		// Force $linkType for SciELO SPS flavor: Only 'uri' and 'clinical-trial' are accepted
+		if ($linkType !== 'clinical-trial') {
+			$linkType = 'uri';
+		}
+
 		$extLink = $doc->createElement('ext-link');
 		$extLink->setAttribute('ext-link-type', $linkType);
 		$extLink->setAttribute('xlink:href', $href);
