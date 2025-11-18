@@ -320,6 +320,6 @@ class Reference extends \DOMElement {
 	 */
 	protected function normalizePublictationTitleTag(?string $publicationType): string
 	{
-		return !$publicationType || !static::PUBLICATION_TITLE_TAG_MAP ? 'article-title' : static::PUBLICATION_TITLE_TAG_MAP[$publicationType];
+		return !$publicationType || !static::PUBLICATION_TITLE_TAG_MAP[$publicationType] ? 'article-title' : static::PUBLICATION_TITLE_TAG_MAP[$publicationType];
 	}
 }
