@@ -309,7 +309,7 @@ class Reference extends \DOMElement {
 	 */
 	private function normalizePublicationType(?string $cslPubType): string
 	{
-		return !$cslPubType || !self::CSL_TO_PUBLICATION_TYPE_MAP[$cslPubType] ? 'other' : static::CSL_TO_PUBLICATION_TYPE_MAP[$cslPubType];
+		return !$cslPubType || !isset(self::CSL_TO_PUBLICATION_TYPE_MAP[$cslPubType]) ? 'other' : static::CSL_TO_PUBLICATION_TYPE_MAP[$cslPubType];
 	}
 
 	/**
@@ -320,6 +320,6 @@ class Reference extends \DOMElement {
 	 */
 	protected function normalizePublictationTitleTag(?string $publicationType): string
 	{
-		return !$publicationType || !static::PUBLICATION_TITLE_TAG_MAP[$publicationType] ? 'article-title' : static::PUBLICATION_TITLE_TAG_MAP[$publicationType];
+		return !$publicationType || !isset(static::PUBLICATION_TITLE_TAG_MAP[$publicationType]) ? 'article-title' : static::PUBLICATION_TITLE_TAG_MAP[$publicationType];
 	}
 }
