@@ -37,7 +37,13 @@ class Par extends Element {
 			if ($class === 'docx2jats\objectModel\body\Field') {
 				// Write links to references from Zotero and Mendeley plugin for MS Word
 				if ($content->getType() === Field::DOCX_FIELD_CSL) {
-					$this->createCLSRef($content->getRefIds(), $content->getPlainCit());
+					// REVIEW if there is a plain citation in a group of citations this may be null and the indexes wrong
+					$cit = $content->getPlainCit();
+					if ($cit == null) {
+						continue;
+					}
+					$this->createCLSRef($content->getRefIds(), $cit);
+					//$this->createCLSRef($content->getRefIds(), $content->getPlainCit());
 				}
 				// Write links to table and figures
 				elseif ($content->getType() === Field::DOCX_FIELD_BOOKMARK_REF) {
@@ -146,12 +152,16 @@ class Par extends Element {
 			$this->appendChild($this->ownerDocument->createTextNode($openGroup));
 		}
 
+		var_dump(compact('refIds', 'plainCit', 'arrCit'));
+
+
 		$lastKey = array_key_last($refIds);
 		$i = 0;
 		foreach ($refIds as $key => $id) {
 			// Format ref text depending on CSL type
 			switch ($type) {
 				case self::CLS_TYPE_APA_COMPATIBLE:
+					echo $i.PHP_EOL;
 					$text = $arrCit[$i++];
 					break;
 				case self::CLS_TYPE_AMA_COMPATIBLE:
