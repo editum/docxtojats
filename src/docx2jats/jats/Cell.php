@@ -63,8 +63,8 @@ class Cell extends Element {
 			&& !$this->hasForbiddenElements($this->childNodes[0])
 		){
 			$p = $this->childNodes[0];
-			foreach ($p->childNodes as $child) {
-				$this->appendChild($child);
+			while ($p->firstChild) {
+				$this->appendChild($p->firstChild);
 			}
 			$this->removeChild($p);
 		}
