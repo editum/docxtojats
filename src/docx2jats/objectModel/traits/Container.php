@@ -74,6 +74,34 @@ trait Container
 						}
 						if (empty($drawingEls)) break;
 
+						// Check if paragraph also contains text outside the drawings
+						$par = new Par($childNode, $this->getOwnerDocument(), $this !== $this->getOwnerDocument() ? $this : null);
+						$hasText = !empty(trim($par->toString()));
+						$textPrecedes = false;
+						if ($hasText) {
+							foreach ($this->getXpath()->query('w:r[.//w:drawing or .//w:t]', $childNode) as $r) {
+								if ($this->getXpath()->query('.//w:drawing', $r)->length > 0) {
+									$textPrecedes = false;
+									break;
+								}
+								if (!empty(trim($r->textContent))) {
+									$textPrecedes = true;
+									break;
+								}
+							}
+							if ($textPrecedes) {
+								if (in_array(Par::DOCX_PAR_REF, $par->getType())) {
+									$reference = new Reference($par->toString());
+									$this->addReference($reference);
+								} else {
+									$content[] = $par;
+								}
+								if ($par->hasBookmarks) {
+									$this->elsHavefldCharRefs[] = count($content) - 1;
+								}
+							}
+						}
+
 						foreach ($drawingEls as $drawingEl) {
 							// check if contains image, charts aren't supported
 							$this->getXpath()->registerNamespace("pic", "http://schemas.openxmlformats.org/drawingml/2006/picture");
@@ -93,6 +121,18 @@ trait Container
 							if ($unUsedCaption) {
 								$figure->setCaption($unUsedCaption);
 								$unUsedCaption = null;
+							}
+						}
+
+						if ($hasText && !$textPrecedes) {
+							if (in_array(Par::DOCX_PAR_REF, $par->getType())) {
+								$reference = new Reference($par->toString());
+								$this->addReference($reference);
+							} else {
+								$content[] = $par;
+							}
+							if ($par->hasBookmarks) {
+								$this->elsHavefldCharRefs[] = count($content) - 1;
 							}
 						}
 
