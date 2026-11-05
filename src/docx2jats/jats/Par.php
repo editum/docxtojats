@@ -152,16 +152,12 @@ class Par extends Element {
 			$this->appendChild($this->ownerDocument->createTextNode($openGroup));
 		}
 
-		var_dump(compact('refIds', 'plainCit', 'arrCit'));
-
-
 		$lastKey = array_key_last($refIds);
 		$i = 0;
 		foreach ($refIds as $key => $id) {
 			// Format ref text depending on CSL type
 			switch ($type) {
 				case self::CLS_TYPE_APA_COMPATIBLE:
-					echo $i.PHP_EOL;
 					$text = $arrCit[$i++];
 					break;
 				case self::CLS_TYPE_AMA_COMPATIBLE:
